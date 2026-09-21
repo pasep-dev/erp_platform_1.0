@@ -1,0 +1,88 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap');
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
+@source '../../storage/framework/views/*.php';
+
+/* --- MENU UTAMA --- */
+@utility menu-item {
+    @apply relative flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200;
+}
+
+/* Menu Active: Background Magenta Utama (#862885), Teks & Icon Putih */
+@utility menu-item-active {
+    @apply bg-brand-700 text-white font-semibold shadow-sm dark:bg-brand-700 dark:text-white;
+}
+
+@utility menu-item-icon-active {
+    @apply text-white;
+}
+
+/* Menu Inactive / Hover: Teks Gray-Secondary, Hover Background Soft Tint (#FAF0FA) & Teks Magenta */
+@utility menu-item-inactive {
+    @apply text-[#5E5E70] hover:bg-[#FAF0FA] hover:text-brand-700 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-white;
+}
+
+@utility menu-item-icon-inactive {
+    @apply text-[#5E5E70] group-hover:text-brand-700 dark:text-gray-400 dark:group-hover:text-white;
+}
+
+/* --- MENU DROPDOWN / SUBMENU --- */
+@utility menu-dropdown-item {
+    @apply flex w-full items-center rounded-lg px-3 py-2 text-sm transition-all duration-200;
+}
+
+@utility menu-dropdown-item-active {
+    @apply bg-brand-700 text-white font-semibold dark:bg-brand-700 dark:text-white;
+}
+
+@utility menu-dropdown-item-inactive {
+    @apply text-[#5E5E70] hover:bg-[#FAF0FA] hover:text-brand-700 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-white;
+}
+
+@theme {
+  --font-sans: 'Outfit', sans-serif;
+  --font-outfit: 'Outfit', sans-serif;
+  --color-citra-purple: #862885;
+
+  /* Menyeting font size saja */
+  --text-tiny: 10px;
+  --text-logo-title: 23px;
+
+  /* Menyeting font size + line-height sekaligus (opsional) */
+  --text-badge: 10px;
+  --text-badge--line-height: 14px;
+
+  /* Skala warna presisi berdasarkan logo #862885 */
+  --color-brand-50: #fdf5fe;
+  --color-brand-100: #faebfc;
+  --color-brand-200: #f5d5f9;
+  --color-brand-300: #efb4f3;
+  --color-brand-400: #e688ea;
+  --color-brand-500: #d55adb;
+  --color-brand-600: #bc3abf;
+  --color-brand-700: #9e2d9e; /* WARNA UTAMA LOGO */
+  --color-brand-800: #862885;
+  --color-brand-900: #6a2568;
+  --color-brand-950: #450d43;
+
+  --color-one: #862885;
+  --color-two: #0891B2;
+  --color-bg-two: #E0F2FE;
+  --color-tree: #D97706;
+  --color-four: #059669;
+
+  --breakpoint-*: initial;
+  --breakpoint-2xsm: 375px;
+  --breakpoint-xsm: 425px;
+  --breakpoint-3xl: 2000px;
+  --breakpoint-sm: 640px;
+  --breakpoint-md: 768px;
+  --breakpoint-lg: 1024px;
+  --breakpoint-xl: 1280px;
+  --breakpoint-2xl: 1536px;
+
+  /* Sisa warna, shadow, & z-index kamu di bawah ini... */
+}
