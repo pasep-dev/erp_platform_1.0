@@ -25,12 +25,6 @@ class VendorRequest extends FormRequest
             ? $vendor->vendor_type_id
             : null;
 
-        $currentProcurementChannelIds = $vendor instanceof Vendor
-            ? $vendor->procurementChannels()
-            ->pluck('mst_procurement_channels.id')
-            ->all()
-            : [];
-
         return [
             'vendor_type_id' => [
                 'required',
@@ -43,29 +37,6 @@ class VendorRequest extends FormRequest
 
                         if ($currentVendorTypeId !== null) {
                             $query->orWhere('id', $currentVendorTypeId);
-                        }
-                    }),
-            ],
-
-            'procurement_channel_ids' => [
-                'nullable',
-                'array',
-            ],
-
-            'procurement_channel_ids.*' => [
-                'string',
-                'size:26',
-                'distinct',
-                Rule::exists('mst_procurement_channels', 'id')
-                    ->whereNull('deleted_at')
-                    ->where(function ($query) use ($currentProcurementChannelIds) {
-                        $query->where('is_active', true);
-
-                        if ($currentProcurementChannelIds !== []) {
-                            $query->orWhereIn(
-                                'id',
-                                $currentProcurementChannelIds,
-                            );
                         }
                     }),
             ],
@@ -127,8 +98,6 @@ class VendorRequest extends FormRequest
     {
         return [
             'vendor_type_id' => 'vendor type',
-            'procurement_channel_ids' => 'procurement channels',
-            'procurement_channel_ids.*' => 'procurement channel',
             'code' => 'vendor code',
             'name' => 'vendor name',
             'tax_number' => 'tax number',

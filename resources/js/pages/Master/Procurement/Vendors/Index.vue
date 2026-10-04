@@ -1,25 +1,19 @@
 <script setup lang="ts">
 import { ref } from "vue";
 import { Head, Link, router } from "@inertiajs/vue3";
-import { Search } from "lucide-vue-next";
 import { route } from "ziggy-js";
 
-import AppLayout from "@/layouts/AppLayout.vue";
+import AppLayout from "@/layout/AppLayout.vue";
 import CrudActions from "@/components/crud/CrudActions.vue";
 import CrudTable from "@/components/crud/CrudTable.vue";
 import DeleteConfirm from "@/components/crud/DeleteConfirm.vue";
 import { useCrud } from "@/composables/useCrud";
+import SearchFilterBar from "@/components/common/SearchFilterBar.vue";
 import Header from "@/components/content/Header.vue";
 
 defineOptions({
     layout: AppLayout,
 });
-
-interface ProcurementChannel {
-    id: string;
-    code: string;
-    name: string;
-}
 
 interface VendorType {
     id: string;
@@ -31,7 +25,6 @@ interface Vendor {
     id: string;
     vendor_type_id: string | null;
     vendor_type: VendorType | null;
-    procurement_channels: ProcurementChannel[];
     code: string;
     name: string;
     tax_number: string | null;
@@ -82,10 +75,6 @@ const columns = [
     {
         key: "vendor_type",
         label: "Vendor Type",
-    },
-    {
-        key: "procurement_channels",
-        label: "Procurement Channels",
     },
     {
         key: "tax_number",
@@ -162,13 +151,11 @@ function confirmDelete(): void {
 </script>
 
 <template>
-    <Head title="Master - Vendors" />
-
     <div class="space-y-6">
         <Header
-            title="Vendors"
-            :action-url="route('master.procurement.vendors.create')"
-            action-label="Add New"
+            title="Master Vendors"
+            :action-url="route('master.procurement.vendor.create')"
+            action-label="Add Vendor"
         />
 
         <div
@@ -177,43 +164,13 @@ function confirmDelete(): void {
             <div
                 class="flex flex-col gap-3 border-b border-gray-200 p-4 sm:flex-row sm:items-center sm:justify-between dark:border-gray-800"
             >
-                <form
-                    class="flex w-full flex-col gap-2 sm:max-w-md sm:flex-row"
-                    @submit.prevent="submitSearch"
-                >
-                    <div class="relative flex-1">
-                        <Search
-                            class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400"
-                        />
-
-                        <input
-                            v-model="search"
-                            type="search"
-                            placeholder="Cari kode, nama, vendor type, tax number..."
-                            class="h-10 w-full rounded-lg border border-gray-300 bg-transparent pl-9 pr-3 text-sm text-gray-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 dark:border-gray-700 dark:text-white"
-                        />
-                    </div>
-
-                    <button
-                        type="submit"
-                        class="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-white/[0.05]"
-                    >
-                        Cari
-                    </button>
-
-                    <button
-                        v-if="search"
-                        type="button"
-                        class="rounded-lg px-3 py-2 text-sm text-gray-500 hover:bg-gray-100 dark:hover:bg-white/[0.05]"
-                        @click="clearSearch"
-                    >
-                        Reset
-                    </button>
-                </form>
-
-                <div class="text-sm text-gray-500 dark:text-gray-400">
-                    Total: {{ vendors.total }}
-                </div>
+                <SearchFilterBar
+                    v-model="search"
+                    :total="vendors.total"
+                    placeholder="Cari data..."
+                    @search="submitSearch"
+                    @clear="clearSearch"
+                />
             </div>
 
             <CrudTable
@@ -252,25 +209,6 @@ function confirmDelete(): void {
 
                     <span v-else class="text-gray-400 dark:text-gray-500">
                         Belum diklasifikasikan
-                    </span>
-                </template>
-
-                <template #cell-procurement_channels="{ row }">
-                    <div
-                        v-if="row.procurement_channels.length > 0"
-                        class="flex max-w-sm flex-wrap gap-1.5"
-                    >
-                        <span
-                            v-for="channel in row.procurement_channels"
-                            :key="channel.id"
-                            class="inline-flex rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-700 dark:bg-gray-500/15 dark:text-gray-300"
-                        >
-                            {{ channel.name }}
-                        </span>
-                    </div>
-
-                    <span v-else class="text-gray-400 dark:text-gray-500">
-                        -
                     </span>
                 </template>
 

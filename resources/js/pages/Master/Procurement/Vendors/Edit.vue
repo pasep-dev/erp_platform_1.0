@@ -2,7 +2,7 @@
 import { Head, useForm } from "@inertiajs/vue3";
 import { route } from "ziggy-js";
 
-import AppLayout from "@/layouts/AppLayout.vue";
+import AppLayout from "@/layout/AppLayout.vue";
 import CrudForm from "@/components/crud/CrudForm.vue";
 
 defineOptions({
@@ -19,6 +19,7 @@ interface Vendor {
     address: string | null;
     description: string | null;
     is_active: boolean;
+    vendor_type_id: string | null;
 }
 
 interface VendorType {
@@ -28,24 +29,13 @@ interface VendorType {
     is_active?: boolean;
 }
 
-interface ProcurementChannel {
-    id: string;
-    code: string;
-    name: string;
-    is_active: boolean;
-}
-
 const props = defineProps<{
     vendor: Vendor;
     vendorTypes: VendorType[];
-    procurementChannels: ProcurementChannel[];
 }>();
 
 const form = useForm({
     vendor_type_id: props.vendor.vendor_type_id ?? "",
-
-    procurement_channel_ids:
-        props.vendor.procurement_channels?.map((channel) => channel.id) ?? [],
 
     code: props.vendor.code,
     name: props.vendor.name,
@@ -281,71 +271,6 @@ const cancel = () => {
                         class="mt-1 text-sm text-red-500"
                     >
                         {{ form.errors.address }}
-                    </p>
-                </div>
-
-                <div
-                    class="md:col-span-2 rounded-xl border border-gray-200 p-4 dark:border-gray-700"
-                >
-                    <div class="mb-3">
-                        <label
-                            class="block text-sm font-medium text-gray-700 dark:text-gray-300"
-                        >
-                            Procurement Channels
-                        </label>
-
-                        <p
-                            class="mt-1 text-xs text-gray-500 dark:text-gray-400"
-                        >
-                            Pilih channel procurement yang dapat digunakan oleh
-                            vendor ini.
-                        </p>
-                    </div>
-
-                    <div
-                        v-if="props.procurementChannels.length > 0"
-                        class="grid grid-cols-1 gap-3 sm:grid-cols-2"
-                    >
-                        <label
-                            v-for="channel in props.procurementChannels"
-                            :key="channel.id"
-                            class="flex cursor-pointer items-start gap-3 rounded-lg border border-gray-200 p-3 transition hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-white/[0.03]"
-                        >
-                            <input
-                                v-model="form.procurement_channel_ids"
-                                type="checkbox"
-                                :value="channel.id"
-                                class="mt-0.5 h-4 w-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500 dark:border-gray-700"
-                            />
-
-                            <div>
-                                <div
-                                    class="text-sm font-medium text-gray-700 dark:text-gray-300"
-                                >
-                                    {{ channel.name }}
-                                </div>
-
-                                <div
-                                    class="text-xs text-gray-400 dark:text-gray-500"
-                                >
-                                    {{ channel.code }}
-                                </div>
-                            </div>
-                        </label>
-                    </div>
-
-                    <div
-                        v-else
-                        class="rounded-lg border border-dashed border-gray-300 p-4 text-sm text-gray-500 dark:border-gray-700 dark:text-gray-400"
-                    >
-                        Belum ada procurement channel aktif.
-                    </div>
-
-                    <p
-                        v-if="form.errors.procurement_channel_ids"
-                        class="mt-1 text-sm text-error-500"
-                    >
-                        {{ form.errors.procurement_channel_ids }}
                     </p>
                 </div>
 

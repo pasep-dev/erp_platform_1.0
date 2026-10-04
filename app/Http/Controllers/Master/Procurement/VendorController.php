@@ -4,12 +4,10 @@ namespace App\Http\Controllers\Master\Procurement;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Master\Procurement\VendorRequest;
-use App\Models\Master\Procurement\ProcurementChannel;
 use App\Models\Master\Procurement\Vendor;
 use App\Models\Master\Procurement\VendorType;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -22,7 +20,6 @@ class VendorController extends Controller
         $vendors = Vendor::query()
             ->with([
                 'vendorType',
-                'procurementChannels',
             ])
             ->when($search !== '', function ($query) use ($search) {
                 $query->where(function ($query) use ($search) {
@@ -37,10 +34,6 @@ class VendorController extends Controller
                             $query->where('code', 'ILIKE', "%{$search}%")
                                 ->orWhere('name', 'ILIKE', "%{$search}%");
                         })
-                        ->orWhereHas('procurementChannels', function ($query) use ($search) {
-                            $query->where('code', 'ILIKE', "%{$search}%")
-                                ->orWhere('name', 'ILIKE', "%{$search}%");
-                        });
                 });
             })
             ->orderBy('name')
@@ -66,37 +59,14 @@ class VendorController extends Controller
                 'name',
             ]);
 
-        $procurementChannels = ProcurementChannel::query()
-            ->where('is_active', true)
-            ->orderBy('name')
-            ->get([
-                'id',
-                'code',
-                'name',
-            ]);
-
         return Inertia::render('Master/Procurement/Vendors/Create', [
             'vendorTypes' => $vendorTypes,
-            'procurementChannels' => $procurementChannels,
         ]);
     }
 
     public function store(VendorRequest $request): RedirectResponse
     {
-        DB::transaction(function () use ($request) {
-            $validated = $request->validated();
-
-            $procurementChannelIds =
-                $validated['procurement_channel_ids'] ?? [];
-
-            unset($validated['procurement_channel_ids']);
-
-            $vendor = Vendor::create($validated);
-
-            $vendor->procurementChannels()->sync(
-                $procurementChannelIds,
-            );
-        });
+        Vendor::create($request->validated());
 
         return redirect()
             ->route('master.procurement.vendors.index')
@@ -121,36 +91,11 @@ class VendorController extends Controller
                 'is_active',
             ]);
 
-        $procurementChannels = ProcurementChannel::query()
-            ->where(function ($query) use ($vendor) {
-                $query->where('is_active', true);
-
-                $currentChannelIds = $vendor
-                    ->procurementChannels()
-                    ->pluck('mst_procurement_channels.id');
-
-                if ($currentChannelIds->isNotEmpty()) {
-                    $query->orWhereIn(
-                        'id',
-                        $currentChannelIds,
-                    );
-                }
-            })
-            ->orderBy('name')
-            ->get([
-                'id',
-                'code',
-                'name',
-                'is_active',
-            ]);
-
         return Inertia::render('Master/Procurement/Vendors/Edit', [
             'vendor' => $vendor->load([
                 'vendorType',
-                'procurementChannels',
             ]),
             'vendorTypes' => $vendorTypes,
-            'procurementChannels' => $procurementChannels,
         ]);
     }
 
@@ -158,20 +103,7 @@ class VendorController extends Controller
         VendorRequest $request,
         Vendor $vendor
     ): RedirectResponse {
-        DB::transaction(function () use ($request, $vendor) {
-            $validated = $request->validated();
-
-            $procurementChannelIds =
-                $validated['procurement_channel_ids'] ?? [];
-
-            unset($validated['procurement_channel_ids']);
-
-            $vendor->update($validated);
-
-            $vendor->procurementChannels()->sync(
-                $procurementChannelIds,
-            );
-        });
+        $vendor->update($request->validated());
 
         return redirect()
             ->route('master.procurement.vendors.index')
