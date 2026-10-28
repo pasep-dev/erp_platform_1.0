@@ -14,7 +14,7 @@ Token global berada di `resources/css/app.css`, dalam selector `:root` dan
 
 | Token | Light | Dark | Penggunaan |
 |---|---|---|---|
-| Primary | `#696cff` | `#696cff` | Aksi utama, tautan, fokus, dan item aktif |
+| Primary | `#8f2a89` | `#8f2a89` | Aksi utama, tautan, fokus, dan item aktif; diambil dari warna lingkaran logo |
 | Latar halaman | `#f5f5f9` | `#25293c` | Permukaan utama halaman |
 | Surface | `#ffffff` | `#2f3349` | Kartu dan kontrol |
 | Surface raised | `#ffffff` | `#34394f` | Permukaan yang ditinggikan |
@@ -41,8 +41,9 @@ Skala root 80% (12.8px dari ukuran default browser 16px) ditetapkan di
   `resources/js/assets/layout/_core.scss`. Ukuran yang ditulis dalam `px`
   tidak mengikuti skala `rem`; periksa juga logo, ikon, dan target interaksi.
 - **Warna primary:** ubah palette `citraPrimaryPalette` di
-  `resources/js/layout/theme.ts`. Preset PrimeVue dan utility warna membaca
-  palette tersebut melalui token `--p-primary-*`.
+  `resources/js/layout/theme.ts`. Warna utama saat ini mengikuti warna ungu
+  lingkaran logo (`#8f2a89`). Preset PrimeVue dan utility warna membaca palette
+  tersebut melalui token `--p-primary-*`.
 - **Token umum atau dark mode:** ubah custom properties di `:root` dan
   `:root.app-dark` pada `resources/css/app.css`. Pertahankan nama token agar
   halaman dan komponen bersama tetap menggunakan nilai yang sama.
@@ -83,8 +84,6 @@ tidak diubah oleh pekerjaan visual.
 - Audit visual runtime seluruh halaman, state dark/collapsed/mobile, dan seluruh
 menu masih memerlukan sesi aplikasi yang terautentikasi. Pada pemeriksaan
 Tahap 7, tab browser yang tersedia diarahkan ke halaman login.
-- Teks putih pada primary `#696cff` memiliki kontras sekitar `4.05:1`, di bawah
-target `4.5:1` untuk teks normal. Menggelapkan warna utama akan menyimpang dari
-warna yang disampling dari referensi; gunakan shade `#5f61e6` (sekitar
-`4.84:1` terhadap putih) bila aksesibilitas kontras didahulukan daripada
-kecocokan warna persis.
+- Primary sebelumnya `#696cff` memiliki kontras teks putih sekitar `4.05:1`.
+Primary ungu logo `#8f2a89` memberi kontras lebih tinggi untuk tombol berteks
+putih dan menyelaraskan tema aplikasi dengan identitas visual.

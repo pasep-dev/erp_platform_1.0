@@ -47,33 +47,40 @@ const page = usePage();
 .guest-brand-panel {
     display: flex;
     flex-direction: column;
-    justify-content: space-between;
-    gap: 3rem;
+    align-items: center;
+    justify-content: center;
+    gap: 3.5rem;
     padding: clamp(2rem, 6vw, 6.5rem);
-    background: linear-gradient(145deg, #383b91 0%, #5558ce 58%, #696cff 100%);
+    background: linear-gradient(
+        145deg,
+        var(--p-primary-900) 0%,
+        var(--p-primary-700) 58%,
+        var(--p-primary-color) 100%
+    );
     color: #fff;
 }
 
 .guest-brand-lockup {
     display: flex;
+    flex-direction: column;
     align-items: center;
-    gap: 1rem;
+    gap: 1.25rem;
 }
 
 .guest-brand-logo-frame {
     display: grid;
-    width: 3.75rem;
-    height: 3.75rem;
-    flex: 0 0 3.75rem;
+    width: clamp(12rem, 22vw, 16rem);
+    aspect-ratio: 1;
+    flex: 0 0 auto;
     place-items: center;
-    border-radius: 1rem;
+    border-radius: 2rem;
     background: #fff;
-    box-shadow: 0 0.5rem 1.5rem rgb(24 27 81 / 18%);
+    box-shadow: 0 1.25rem 3rem rgb(35 16 53 / 24%);
 }
 
 .guest-brand-logo {
-    width: 2.5rem;
-    height: 2.5rem;
+    width: 78%;
+    height: 78%;
     object-fit: contain;
 }
 
@@ -85,6 +92,7 @@ const page = usePage();
 
 .guest-brand-message {
     max-width: 34rem;
+    text-align: center;
 }
 
 .guest-brand-message h1 {
@@ -140,21 +148,17 @@ const page = usePage();
     }
 
     .guest-brand-panel {
-        justify-content: flex-start;
         gap: 1.5rem;
-        padding: 1.5rem;
+        padding: 2rem 1.5rem;
     }
 
     .guest-brand-logo-frame {
-        width: 3rem;
-        height: 3rem;
-        flex-basis: 3rem;
-        border-radius: 0.75rem;
+        width: 7rem;
+        border-radius: 1.5rem;
     }
 
-    .guest-brand-logo {
-        width: 2rem;
-        height: 2rem;
+    .guest-brand-lockup {
+        gap: 0.875rem;
     }
 
     .guest-brand-message h1 {

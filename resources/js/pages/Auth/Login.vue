@@ -157,7 +157,7 @@ const submit = () => {
 
 <style scoped>
 .login-eyebrow {
-    color: var(--p-primary-color);
+    color: var(--p-primary-700);
 }
 
 .login-heading,
