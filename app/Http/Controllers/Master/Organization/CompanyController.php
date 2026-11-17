@@ -47,7 +47,7 @@ class CompanyController extends Controller
         Company::create($request->validated());
 
         return to_route('master.organization.companies.index')
-            ->with('success', 'Company berhasil dibuat.');
+            ->with('success', 'Company was created successfully.');
     }
 
     public function edit(Company $company): Response
@@ -64,7 +64,7 @@ class CompanyController extends Controller
         $company->update($request->validated());
 
         return to_route('master.organization.companies.index')
-            ->with('success', 'Company berhasil diperbarui.');
+            ->with('success', 'Company was updated successfully.');
     }
 
     public function destroy(Company $company): RedirectResponse
@@ -72,6 +72,6 @@ class CompanyController extends Controller
         $company->delete();
 
         return to_route('master.organization.companies.index')
-            ->with('success', 'Company berhasil dihapus.');
+            ->with('success', 'Company was deleted successfully.');
     }
 }

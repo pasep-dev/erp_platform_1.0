@@ -1,0 +1,717 @@
+/* You can add global styles to this file, and also import other style files */
+@use 'primeicons/primeicons.css';
+@use '@/assets/layout/layout.scss';
+@use '@/assets/demo/demo.scss';
+
+@layer components {
+    .app-card {
+        border: 0;
+        border-radius: var(--app-radius-card);
+        background: var(--app-surface);
+        box-shadow: var(--app-shadow-card);
+        padding: var(--app-spacing-card);
+    }
+}
+
+.layout-main-container {
+    padding-inline: clamp(1rem, 2vw, 2rem) !important;
+}
+
+.layout-main {
+    width: 100%;
+    max-width: none;
+    margin-inline: auto;
+}
+
+.app-page-header {
+    row-gap: var(--app-space-4);
+}
+
+.app-page-header :is(h1, h2, .app-page-title) {
+    margin: 0 !important;
+    color: var(--app-text-primary) !important;
+    font-size: var(--app-font-size-2xl) !important;
+    font-weight: 600 !important;
+    line-height: 1.3 !important;
+}
+
+.app-page-header p {
+    color: var(--app-text-secondary);
+    line-height: 1.5;
+}
+
+.layout-main .app-card,
+.layout-main .p-card,
+.layout-main :is(
+    [class~="rounded-xl"][class~="border"][class~="bg-white"],
+    [class~="rounded-2xl"][class~="border"][class~="bg-white"],
+    [class~="rounded-3xl"][class~="border"][class~="bg-white"],
+    [class~="rounded-xl"][class~="border"][class~="bg-surface-0"]
+) {
+    border: 0;
+    border-radius: var(--app-radius-card);
+    background-color: var(--app-surface);
+    box-shadow: var(--app-shadow-card);
+}
+
+/* =========================================
+   CITRA / SAKAI LAYOUT
+   ========================================= */
+
+.layout-sidebar {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+
+    width: 20rem !important;
+    height: 100vh !important;
+
+    margin: 0 !important;
+    border-radius: 0 !important;
+
+    z-index: 999 !important;
+
+    overflow: visible !important;
+
+    box-shadow: none !important;
+    border-right: 1px solid var(--app-border);
+
+    transition:
+        width 0.3s ease,
+        transform 0.3s ease !important;
+}
+
+.layout-sidebar.sidebar-with-footer {
+    padding: 0 1rem 1rem !important;
+}
+
+.sidebar-menu-scroll {
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+    scrollbar-gutter: stable;
+}
+
+/* Keep the navbar inset from the sidebar and content edges, like a floating card. */
+.layout-topbar {
+    top: 1rem !important;
+    right: 2rem !important;
+    left: 22rem !important;
+    width: auto !important;
+    height: 4rem !important;
+    padding: 0 1rem !important;
+    border: 1px solid var(--app-border);
+    border-radius: var(--app-radius-card);
+    background: var(--app-surface) !important;
+    box-shadow: var(--app-shadow-card);
+    backdrop-filter: blur(12px);
+    transition:
+        left 0.3s ease,
+        top 0.25s ease,
+        height 0.25s ease,
+        border-radius 0.25s ease,
+        box-shadow 0.25s ease,
+        background-color 0.2s ease !important;
+}
+
+.layout-topbar.layout-topbar-scrolled {
+    top: 0 !important;
+    height: 3.5rem !important;
+    border-top: 0;
+    border-radius: 0 0 var(--app-radius-card) var(--app-radius-card);
+    box-shadow: 0 4px 16px rgb(67 89 113 / 16%);
+}
+
+.layout-topbar-actions,
+.layout-topbar-menu-content,
+.layout-config-menu {
+    align-items: center;
+}
+
+.layout-topbar-actions {
+    gap: 0.5rem !important;
+}
+
+.layout-topbar .layout-topbar-action {
+    border-radius: var(--app-radius-control);
+    color: var(--app-text-secondary);
+}
+
+.layout-topbar .layout-menu-button .sidebar-toggle-icon {
+    display: block;
+    width: 1.5rem;
+    height: 1.5rem;
+}
+
+.layout-topbar .layout-topbar-action:hover {
+    background: var(--app-primary-soft);
+    color: var(--p-primary-color);
+}
+
+.layout-topbar .layout-topbar-action:focus-visible {
+    outline: 2px solid var(--p-primary-color);
+    outline-offset: 2px;
+}
+
+.layout-wrapper.layout-overlay .layout-topbar {
+    left: 2rem !important;
+}
+
+/* =========================================
+   DESKTOP
+   ========================================= */
+
+@media (min-width: 992px) {
+
+    .layout-wrapper.layout-static.layout-static-inactive {
+        display: block !important;
+    }
+
+    .layout-main-container {
+        margin-left: 20rem !important;
+
+        transition:
+            margin-left 0.3s ease !important;
+    }
+
+    /* Sidebar ditutup */
+    .layout-wrapper.layout-static.layout-static-inactive .layout-sidebar {
+        width: 5rem !important;
+        left: 0 !important;
+        transform: none !important;
+        overflow: visible !important;
+    }
+
+    .layout-static-inactive .sidebar-menu-scroll {
+        overflow: visible !important;
+    }
+
+    .layout-wrapper.layout-static.layout-static-inactive .layout-main-container {
+        margin-left: 5rem !important;
+    }
+
+    .layout-static-inactive .layout-topbar {
+        left: 7rem !important;
+    }
+
+    .layout-static-inactive .sidebar-brand-header {
+        gap: 0;
+        justify-content: center;
+        margin-right: -1rem;
+        margin-left: -1rem;
+        padding: 0 0.5rem;
+    }
+
+    .layout-static-inactive .sidebar-brand-logo {
+        width: 2rem !important;
+        height: 2rem !important;
+    }
+
+    .layout-static-inactive .sidebar-brand {
+        width: 100%;
+        flex: 0 0 100% !important;
+        justify-content: center;
+    }
+
+    .layout-static-inactive .sidebar-brand-copy {
+        display: none !important;
+    }
+
+    .layout-static-inactive .layout-sidebar .sidebar-footer {
+        width: calc(100% + 2rem);
+        justify-content: center;
+        margin-inline: -1rem;
+        padding: 0.75rem 0.25rem;
+    }
+
+    .layout-static-inactive .layout-sidebar .sidebar-footer-label {
+        display: none;
+    }
+
+    .layout-static-inactive .layout-sidebar .sidebar-project-version {
+        padding: 0.1875rem 0.375rem;
+    }
+
+    .layout-static-inactive .layout-menu-group-label {
+        display: none;
+    }
+
+    .layout-static-inactive .layout-root-menuitem {
+        position: relative;
+    }
+
+    .layout-static-inactive .root-menu-link {
+        position: relative;
+        width: 3rem;
+        justify-content: center;
+        gap: 0;
+        margin-inline: auto;
+        padding-inline: 0;
+    }
+
+    .layout-static-inactive .root-menu-label {
+        display: none;
+    }
+
+    .layout-static-inactive .root-menu-arrow {
+        position: absolute;
+        right: 0.15rem;
+        font-size: 0.625rem;
+    }
+
+    .layout-static-inactive .root-menu-icon {
+        width: 1.25rem;
+        height: 1.25rem;
+    }
+
+    .layout-static-inactive .layout-root-menuitem > .layout-submenu {
+        position: absolute;
+        z-index: 1002;
+        top: 0;
+        left: calc(100% - 0.25rem);
+        display: none !important;
+        width: 17rem;
+        margin: 0;
+        padding: 0.5rem;
+        border: 1px solid var(--app-border);
+        border-radius: var(--app-radius-card);
+        background: var(--app-surface);
+        box-shadow: var(--app-shadow-card);
+    }
+
+    .layout-static-inactive
+        .layout-root-menuitem:hover
+        > .layout-submenu,
+    .layout-static-inactive
+        .layout-root-menuitem:focus-within
+        > .layout-submenu {
+        display: block !important;
+    }
+
+    .layout-static-inactive .layout-submenu > li {
+        position: relative;
+    }
+
+    .layout-static-inactive .layout-submenu .layout-submenu {
+        position: relative;
+        z-index: auto;
+        top: auto;
+        left: auto;
+        display: none !important;
+        width: auto;
+        margin: 0.25rem 0 0.375rem 0.625rem;
+        padding: 0.125rem 0 0.125rem 0.625rem;
+        border: 0;
+        border-left: 1px solid var(--app-border);
+        border-radius: 0;
+        background: transparent;
+        box-shadow: none;
+    }
+
+    .layout-static-inactive .layout-submenu > li:hover > .layout-submenu,
+    .layout-static-inactive
+        .layout-submenu
+        > li:focus-within
+        > .layout-submenu {
+        display: block !important;
+    }
+
+    .layout-static-inactive .layout-submenu .submenu-parent-link {
+        min-height: 2.25rem;
+        margin-bottom: 0 !important;
+        padding: 0.5rem 0.625rem !important;
+        font-weight: 600;
+    }
+
+    .layout-static-inactive .layout-submenu .leaf-menu-link {
+        min-height: 2.125rem;
+        padding: 0.4375rem 0.625rem !important;
+    }
+
+    .layout-static-inactive .layout-submenu-toggler {
+        margin-left: auto;
+        color: var(--app-text-muted);
+        font-size: 0.75rem;
+    }
+
+    .layout-static-inactive .submenu-parent-link:hover {
+        background: var(--app-primary-soft) !important;
+        color: var(--p-primary-color) !important;
+    }
+}
+
+
+/* =========================================
+   MOBILE / TABLET
+   ========================================= */
+
+@media (max-width: 991px) {
+
+    .layout-sidebar {
+        width: 20rem !important;
+
+        transform: translateX(-100%) !important;
+    }
+
+    /* Sidebar mobile dibuka */
+    .layout-mobile-active .layout-sidebar {
+        transform: translateX(0) !important;
+    }
+
+    /* Content mobile selalu full width */
+    .layout-main-container {
+        margin-left: 0 !important;
+        padding: 5.75rem 1rem 0 !important;
+    }
+
+    .layout-topbar {
+        top: 0.75rem !important;
+        right: 1rem !important;
+        left: 1rem !important;
+        height: 4rem !important;
+        padding: 0 0.5rem !important;
+    }
+
+    .layout-topbar.layout-topbar-scrolled {
+        top: 0 !important;
+        height: 3.5rem !important;
+    }
+
+    .layout-wrapper .layout-topbar {
+        left: 1rem !important;
+    }
+
+    .layout-wrapper.layout-overlay .layout-topbar {
+        left: 1rem !important;
+    }
+
+    .layout-topbar-actions,
+    .layout-topbar-menu-content,
+    .layout-config-menu {
+        gap: 0.25rem !important;
+    }
+
+    .layout-topbar .layout-topbar-action {
+        width: 2.25rem;
+        height: 2.25rem;
+    }
+
+    .layout-topbar .layout-topbar-menu {
+        top: calc(100% + 0.5rem);
+        right: 0;
+        border: 1px solid var(--app-border);
+        background: var(--app-surface);
+        box-shadow: var(--app-shadow-card);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .layout-topbar {
+        transition: none !important;
+    }
+}
+
+:root.app-dark .layout-static-inactive .layout-root-menuitem > .layout-submenu {
+    border-color: var(--app-border);
+    background: var(--app-surface);
+}
+
+:root .p-button {
+    min-height: 2.5rem;
+    padding: 0.5rem 0.875rem;
+    border-radius: var(--app-radius-control);
+    font-family: inherit;
+    font-size: var(--app-font-size-sm);
+    font-weight: 600;
+    transition:
+        background-color 0.2s ease,
+        border-color 0.2s ease,
+        box-shadow 0.2s ease,
+        color 0.2s ease;
+}
+
+.p-button:focus-visible,
+.p-inputtext:focus-visible,
+.p-select:focus-visible,
+.p-textarea:focus-visible {
+    outline: 2px solid var(--p-primary-color);
+    outline-offset: 2px;
+}
+
+:root .p-button.p-button-sm {
+    min-height: 2rem;
+    padding: 0.375rem 0.625rem;
+}
+
+:root .p-button.p-button-icon-only {
+    width: 2.5rem;
+    min-width: 2.5rem;
+    padding: 0.5rem;
+}
+
+.p-inputtext,
+.p-select,
+.p-multiselect,
+.p-autocomplete,
+.p-datepicker,
+.p-textarea {
+    min-height: 2.5rem;
+    border-color: var(--app-border);
+    border-radius: var(--app-radius-control);
+    background: var(--app-surface);
+    color: var(--app-text-primary);
+    font-family: inherit;
+    font-size: var(--app-font-size-sm);
+    box-shadow: none;
+}
+
+.p-inputtext,
+.p-textarea {
+    padding: 0.5rem 0.75rem;
+}
+
+.p-select-label,
+.p-multiselect-label {
+    padding: 0.5rem 0.75rem;
+    color: var(--app-text-primary);
+    font-size: var(--app-font-size-sm);
+}
+
+.p-select-dropdown,
+.p-multiselect-dropdown {
+    width: 2.5rem;
+}
+
+.p-inputtext::placeholder,
+.p-textarea::placeholder {
+    color: var(--app-text-muted);
+}
+
+:root .p-select-overlay.p-component,
+:root .p-multiselect-overlay.p-component,
+:root .p-autocomplete-overlay.p-component,
+:root .p-datepicker-panel.p-component,
+:root .p-popover.p-component,
+:root .p-menu.p-component,
+:root .p-tieredmenu.p-component,
+:root .p-contextmenu.p-component {
+    overflow: hidden;
+    border: 1px solid var(--app-border);
+    border-radius: var(--app-radius-card);
+    background: var(--app-surface);
+    color: var(--app-text-primary);
+    box-shadow: var(--app-shadow-card);
+}
+
+.p-select-option,
+.p-multiselect-option,
+.p-autocomplete-option {
+    min-height: 2.5rem;
+    padding: 0.625rem 0.75rem;
+    color: var(--app-text-primary);
+    font-size: var(--app-font-size-sm);
+}
+
+.p-select-option:not(.p-select-option-selected):not(.p-disabled):hover,
+.p-multiselect-option:not(.p-multiselect-option-selected):not(.p-disabled):hover,
+.p-autocomplete-option:not(.p-autocomplete-option-selected):not(.p-disabled):hover {
+    background: var(--app-primary-soft);
+    color: var(--p-primary-color);
+}
+
+.p-select-option-selected,
+.p-multiselect-option-selected,
+.p-autocomplete-option-selected {
+    background: var(--app-primary-soft);
+    color: var(--p-primary-color);
+}
+
+.p-datatable {
+    overflow: hidden;
+    border-radius: var(--app-radius-card);
+    color: var(--app-text-primary);
+    font-size: var(--app-font-size-sm);
+}
+
+.p-datatable-table-container {
+    border: 1px solid var(--app-border);
+    border-radius: var(--app-radius-card);
+}
+
+.p-datatable-thead > tr > th {
+    padding: 0.75rem 1rem;
+    border-color: var(--app-border);
+    background: var(--app-page-background);
+    color: var(--app-text-secondary);
+    font-size: var(--app-font-size-sm);
+    font-weight: 600;
+}
+
+.p-datatable-tbody > tr > td {
+    padding: 0.75rem 1rem;
+    border-color: var(--app-border);
+    background: var(--app-surface);
+    color: var(--app-text-primary);
+    font-size: var(--app-font-size-sm);
+}
+
+.p-datatable-tbody > tr {
+    transition: background-color 0.15s ease;
+}
+
+.p-datatable-tbody > tr:hover > td {
+    background: var(--app-page-background);
+}
+
+.p-datatable-header,
+.p-datatable-footer {
+    padding: 0.875rem 1rem;
+    border-color: var(--app-border);
+    background: var(--app-surface);
+}
+
+.p-paginator {
+    gap: 0.25rem;
+    padding: 0.75rem 0;
+    border: 0;
+    background: transparent;
+    color: var(--app-text-secondary);
+    font-size: var(--app-font-size-sm);
+}
+
+.p-paginator-page,
+.p-paginator-first,
+.p-paginator-prev,
+.p-paginator-next,
+.p-paginator-last {
+    min-width: 2.25rem;
+    min-height: 2.25rem;
+    border-radius: var(--app-radius-control);
+    color: var(--app-text-secondary);
+    font-size: var(--app-font-size-sm);
+}
+
+.p-paginator-page.p-paginator-page-selected {
+    background: var(--app-primary-soft);
+    color: var(--p-primary-color);
+}
+
+.p-tag.p-component {
+    min-height: 1.5rem;
+    padding: 0.25rem 0.5rem;
+    border-radius: var(--app-radius-control);
+    font-family: inherit;
+    font-size: var(--app-font-size-xs);
+    font-weight: 600;
+}
+
+.p-tag.p-component.p-tag-success,
+.p-badge.p-badge-success {
+    background: var(--app-success-soft);
+    color: var(--app-success-strong);
+}
+
+.p-tag.p-component.p-tag-info,
+.p-badge.p-badge-info {
+    background: var(--app-info-soft);
+    color: var(--app-info-strong);
+}
+
+.p-tag.p-component.p-tag-warn,
+.p-tag.p-component.p-tag-warning,
+.p-badge.p-badge-warn,
+.p-badge.p-badge-warning {
+    background: var(--app-warning-soft);
+    color: var(--app-warning-strong);
+}
+
+.p-tag.p-component.p-tag-danger,
+.p-badge.p-badge-danger {
+    background: var(--app-danger-soft);
+    color: var(--app-danger-strong);
+}
+
+.p-badge {
+    min-width: 1.25rem;
+    height: 1.25rem;
+    padding-inline: 0.375rem;
+    font-size: var(--app-font-size-sm);
+    font-weight: 600;
+}
+
+:root .p-dialog.p-component {
+    overflow: hidden;
+    border: 1px solid var(--app-border);
+    border-radius: var(--app-radius-card);
+    background: var(--app-surface);
+    color: var(--app-text-primary);
+    box-shadow: var(--app-shadow-card);
+}
+
+:root .p-dialog .p-dialog-header {
+    padding: 1.25rem 1.5rem 0.875rem;
+    background: var(--app-surface);
+    color: var(--app-text-primary);
+}
+
+:root .p-dialog .p-dialog-title {
+    font-size: var(--app-font-size-lg);
+    font-weight: 600;
+}
+
+:root .p-dialog .p-dialog-content {
+    background: var(--app-surface);
+    color: var(--app-text-primary);
+}
+
+:root .p-dialog .p-dialog-footer {
+    padding: 0.875rem 1.5rem 1.25rem;
+    border-color: var(--app-border);
+    background: var(--app-surface);
+}
+
+:root .p-toast .p-toast-message {
+    overflow: hidden;
+    border-radius: var(--app-radius-card);
+    box-shadow: var(--app-shadow-card);
+}
+
+:root .p-toast .p-toast-message-content {
+    gap: 0.75rem;
+    padding: 1rem 1.125rem;
+}
+
+:root .p-toast .p-toast-summary {
+    font-size: var(--app-font-size-sm);
+    font-weight: 600;
+}
+
+:root .p-toast .p-toast-detail {
+    font-size: var(--app-font-size-sm);
+    line-height: 1.5;
+}
+
+.p-tabs {
+    color: var(--app-text-primary);
+}
+
+.p-tablist {
+    border-color: var(--app-border);
+}
+
+.p-tab {
+    min-height: 2.75rem;
+    padding: 0.625rem 0.875rem;
+    color: var(--app-text-secondary);
+    font-size: var(--app-font-size-sm);
+    font-weight: 600;
+}
+
+.p-tab-active {
+    color: var(--p-primary-color);
+}
+
+.p-tabpanels {
+    padding: 1.25rem 0;
+    background: transparent;
+    color: var(--app-text-primary);
+}

@@ -8,8 +8,32 @@ services:
     working_dir: /var/www/html
     volumes:
       - ./:/var/www/html
+      - type: bind
+        source: ${BACKUP_HOST_PATH:-./database-backups}
+        target: ${BACKUP_VOLUME_PATH:-/var/backups/erp}
+        bind:
+          create_host_path: true
     ports:
       - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  scheduler:
+    build:
+      context: .
+      dockerfile: docker/php/Dockerfile
+    container_name: erp-platform-scheduler
+    restart: unless-stopped
+    working_dir: /var/www/html
+    volumes:
+      - ./:/var/www/html
+      - type: bind
+        source: ${BACKUP_HOST_PATH:-./database-backups}
+        target: ${BACKUP_VOLUME_PATH:-/var/backups/erp}
+        bind:
+          create_host_path: true
+    command: ["php", "artisan", "schedule:work"]
     depends_on:
       postgres:
         condition: service_healthy

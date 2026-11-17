@@ -60,7 +60,7 @@ class BranchController extends Controller
         Branch::create($request->validated());
 
         return to_route('master.organization.branches.index')
-            ->with('success', 'Branch berhasil dibuat.');
+            ->with('success', 'Branch was created successfully.');
     }
 
     public function edit(Branch $branch): Response
@@ -82,7 +82,7 @@ class BranchController extends Controller
         $branch->update($request->validated());
 
         return to_route('master.organization.branches.index')
-            ->with('success', 'Branch berhasil diperbarui.');
+            ->with('success', 'Branch was updated successfully.');
     }
 
     public function destroy(Branch $branch): RedirectResponse
@@ -90,6 +90,6 @@ class BranchController extends Controller
         $branch->delete();
 
         return to_route('master.organization.branches.index')
-            ->with('success', 'Branch berhasil dihapus.');
+            ->with('success', 'Branch was deleted successfully.');
     }
 }

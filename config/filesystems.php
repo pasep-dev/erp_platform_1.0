@@ -38,6 +38,13 @@ return [
             'report' => false,
         ],
 
+        'database_backups' => [
+            'driver' => 'local',
+            'root' => env('BACKUP_VOLUME_PATH', '/var/backups/erp'),
+            'throw' => true,
+            'report' => false,
+        ],
+
         'public' => [
             'driver' => 'local',
             'root' => storage_path('app/public'),

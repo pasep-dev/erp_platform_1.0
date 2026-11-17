@@ -2,16 +2,14 @@
 
 namespace App\Http\Requests\Master\Procurement;
 
+use App\Http\Requests\Master\AuthorizesMasterData;
 use App\Models\Master\Procurement\Tax;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
 class TaxRequest extends FormRequest
 {
-    public function authorize(): bool
-    {
-        return $this->user() !== null;
-    }
+    use AuthorizesMasterData;
 
     public function rules(): array
     {

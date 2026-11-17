@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\NumberingDocument;
+use App\Models\NumberingModule;
 use App\Models\NumberingSequence;
 use App\Services\NumberingService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -141,6 +142,8 @@ class NumberingServiceTest extends TestCase
 
     public function test_rejects_an_unsupported_placeholder(): void
     {
+        $this->createNumberingModule('INVALID');
+
         NumberingDocument::create([
             'code' => 'INVALID',
             'name' => 'Invalid Rule',
@@ -191,6 +194,22 @@ class NumberingServiceTest extends TestCase
         ]);
     }
 
+    public function test_rejects_number_generation_when_module_integration_is_disabled(): void
+    {
+        NumberingModule::query()
+            ->where('code', 'ASSET')
+            ->update(['is_active' => false]);
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('not found or inactive');
+
+        app(NumberingService::class)->generate('ASSET', [
+            'company' => 'CITRA',
+            'asset_type' => 'LTP',
+            'branch' => 'JKT',
+        ]);
+    }
+
     public function test_uses_the_configured_sequence_length(): void
     {
         NumberingDocument::query()
@@ -209,8 +228,30 @@ class NumberingServiceTest extends TestCase
         );
     }
 
+    public function test_starts_the_sequence_at_the_configured_value(): void
+    {
+        NumberingDocument::query()
+            ->where('code', 'PURCHASE_REQUEST')
+            ->update([
+                'sequence_start' => 8,
+            ]);
+
+        $year = now()->format('Y');
+
+        $this->assertSame(
+            "CAA/PR/IT/{$year}/008",
+            app(NumberingService::class)->generate('PURCHASE_REQUEST', [
+                'company' => 'CAA',
+                'document_type' => 'PR',
+                'department' => 'IT',
+            ]),
+        );
+    }
+
     public function test_rejects_a_numbering_rule_without_sequence_placeholder(): void
     {
+        $this->createNumberingModule('NO_SEQUENCE');
+
         NumberingDocument::create([
             'code' => 'NO_SEQUENCE',
             'name' => 'No Sequence Rule',
@@ -231,6 +272,8 @@ class NumberingServiceTest extends TestCase
 
     public function test_rejects_an_empty_numbering_pattern(): void
     {
+        $this->createNumberingModule('EMPTY_PATTERN');
+
         NumberingDocument::create([
             'code' => 'EMPTY_PATTERN',
             'name' => 'Empty Pattern Rule',
@@ -250,6 +293,8 @@ class NumberingServiceTest extends TestCase
 
     public function test_rejects_an_invalid_sequence_length(): void
     {
+        $this->createNumberingModule('INVALID_LENGTH');
+
         NumberingDocument::create([
             'code' => 'INVALID_LENGTH',
             'name' => 'Invalid Length Rule',
@@ -264,6 +309,19 @@ class NumberingServiceTest extends TestCase
 
         app(NumberingService::class)->generate('INVALID_LENGTH', [
             'company' => 'CAA',
+        ]);
+    }
+
+    private function createNumberingModule(string $code): NumberingModule
+    {
+        return NumberingModule::query()->create([
+            'code' => $code,
+            'name' => $code,
+            'category' => 'Testing',
+            'default_pattern' => '{SEQ}',
+            'sequence_length' => 3,
+            'reset_period' => 'never',
+            'is_active' => true,
         ]);
     }
 }

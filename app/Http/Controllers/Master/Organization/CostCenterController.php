@@ -65,7 +65,7 @@ class CostCenterController extends Controller
         CostCenter::create($request->validated());
 
         return to_route('master.organization.cost-centers.index')
-            ->with('success', 'Cost Center berhasil dibuat.');
+            ->with('success', 'Cost Center was created successfully.');
     }
 
     public function edit(CostCenter $costCenter): Response
@@ -90,7 +90,7 @@ class CostCenterController extends Controller
         $costCenter->update($request->validated());
 
         return to_route('master.organization.cost-centers.index')
-            ->with('success', 'Cost Center berhasil diperbarui.');
+            ->with('success', 'Cost Center was updated successfully.');
     }
 
     public function destroy(
@@ -99,6 +99,6 @@ class CostCenterController extends Controller
         $costCenter->delete();
 
         return to_route('master.organization.cost-centers.index')
-            ->with('success', 'Cost Center berhasil dihapus.');
+            ->with('success', 'Cost Center was deleted successfully.');
     }
 }

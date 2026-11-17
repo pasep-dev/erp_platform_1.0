@@ -91,7 +91,7 @@ class LocationController extends Controller
         Location::create($request->validated());
 
         return to_route('master.organization.locations.index')
-            ->with('success', 'Location berhasil dibuat.');
+            ->with('success', 'Location was created successfully.');
     }
 
     public function edit(Location $location): Response
@@ -127,7 +127,7 @@ class LocationController extends Controller
         $location->update($request->validated());
 
         return to_route('master.organization.locations.index')
-            ->with('success', 'Location berhasil diperbarui.');
+            ->with('success', 'Location was updated successfully.');
     }
 
     public function destroy(
@@ -136,6 +136,6 @@ class LocationController extends Controller
         $location->delete();
 
         return to_route('master.organization.locations.index')
-            ->with('success', 'Location berhasil dihapus.');
+            ->with('success', 'Location was deleted successfully.');
     }
 }

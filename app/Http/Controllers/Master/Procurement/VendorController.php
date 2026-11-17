@@ -6,8 +6,11 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Master\Procurement\VendorRequest;
 use App\Models\Master\Procurement\Vendor;
 use App\Models\Master\Procurement\VendorType;
+use App\Models\NumberingDocument;
+use App\Services\NumberingService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -33,7 +36,7 @@ class VendorController extends Controller
                         ->orWhereHas('vendorType', function ($query) use ($search) {
                             $query->where('code', 'ILIKE', "%{$search}%")
                                 ->orWhere('name', 'ILIKE', "%{$search}%");
-                        })
+                        });
                 });
             })
             ->orderBy('name')
@@ -64,13 +67,33 @@ class VendorController extends Controller
         ]);
     }
 
-    public function store(VendorRequest $request): RedirectResponse
-    {
-        Vendor::create($request->validated());
+    public function store(
+        VendorRequest $request,
+        NumberingService $numberingService,
+    ): RedirectResponse {
+        $data = $request->validated();
+
+        if (blank($data['code'] ?? null)) {
+            if (! $numberingService->hasActiveDocument(NumberingDocument::CODE_VENDOR)) {
+                throw ValidationException::withMessages([
+                    'code' => 'Enter a vendor code or configure an active VENDOR numbering rule.',
+                ]);
+            }
+
+            $data['code'] = $numberingService->generate(NumberingDocument::CODE_VENDOR);
+
+            if (Vendor::withTrashed()->where('code', $data['code'])->exists()) {
+                throw ValidationException::withMessages([
+                    'code' => 'Generated vendor code already exists. Update the numbering sequence start.',
+                ]);
+            }
+        }
+
+        Vendor::create($data);
 
         return redirect()
             ->route('master.procurement.vendors.index')
-            ->with('success', 'Vendor berhasil ditambahkan.');
+            ->with('success', 'Vendor was added successfully.');
     }
 
     public function edit(Vendor $vendor): Response
@@ -107,7 +130,7 @@ class VendorController extends Controller
 
         return redirect()
             ->route('master.procurement.vendors.index')
-            ->with('success', 'Vendor berhasil diperbarui.');
+            ->with('success', 'Vendor was updated successfully.');
     }
 
     public function destroy(Vendor $vendor): RedirectResponse
@@ -116,6 +139,6 @@ class VendorController extends Controller
 
         return redirect()
             ->route('master.procurement.vendors.index')
-            ->with('success', 'Vendor berhasil dihapus.');
+            ->with('success', 'Vendor was deleted successfully.');
     }
 }

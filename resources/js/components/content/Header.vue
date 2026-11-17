@@ -1,10 +1,15 @@
 <script setup lang="ts">
 import type { Component } from "vue";
 import { computed } from "vue";
-import { Link } from "@inertiajs/vue3";
-import { Plus } from "lucide-vue-next";
+import { Link, Head } from "@inertiajs/vue3"; // 1. Import Head dari Inertia
+import { Plus, ChevronRight } from "lucide-vue-next";
 
 type ButtonColor = "brand" | "green" | "red" | "gray";
+
+export interface BreadcrumbItem {
+    label: string;
+    url?: string;
+}
 
 interface Props {
     title: string;
@@ -12,14 +17,15 @@ interface Props {
     icon?: Component;
     actionUrl?: string;
     actionLabel?: string;
-    actionColor?: ButtonColor; // Props warna opsional (default: brand)
+    actionColor?: ButtonColor;
+    breadcrumbs?: BreadcrumbItem[];
 }
 
 const props = withDefaults(defineProps<Props>(), {
     actionColor: "brand",
+    breadcrumbs: () => [],
 });
 
-// Mapping class Tailwind berdasarkan varian warna agar aman dari purging
 const buttonColorClasses = computed(() => {
     switch (props.actionColor) {
         case "green":
@@ -36,35 +42,26 @@ const buttonColorClasses = computed(() => {
 </script>
 
 <template>
+    <!-- 2. Tambahkan Head di sini. Judul tab browser otomatis sesuai prop 'title' -->
+    <Head :title="title" />
+
     <div
-        class="flex flex-col justify-between gap-4 sm:flex-row sm:items-center"
+        class="app-page-header flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"
     >
-        <div>
-            <div class="flex items-center gap-2">
-                <component
-                    :is="icon"
-                    v-if="icon"
-                    class="h-6 w-6 text-brand-700"
-                />
-                <h1
-                    class="text-2xl font-bold tracking-tight text-gray-900 dark:text-white"
+        <div class="space-y-1">
+            <div class="flex items-center">
+                <h2
+                    class="app-page-title text-3xl font-bold tracking-tight text-gray-800 dark:text-white"
                 >
                     {{ title }}
-                </h1>
+                </h2>
             </div>
 
             <!-- Garis Aksen Ungu Logo -->
-            <div class="mt-2 h-1 w-12 rounded-full bg-brand-700"></div>
-
-            <p
-                v-if="description"
-                class="mt-2 text-sm text-gray-500 dark:text-gray-400"
-            >
-                {{ description }}
-            </p>
+            <div class="h-1.5 w-25 m-0 rounded-full bg-brand-700"></div>
         </div>
 
-        <!-- Tombol Aksi Opsional dengan Warna Dinamis -->
+        <!-- Tombol Aksi Opsional -->
         <Link
             v-if="actionUrl && actionLabel"
             :href="actionUrl"

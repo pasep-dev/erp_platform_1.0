@@ -57,7 +57,7 @@ class UnitOfMeasureController extends Controller
         UnitOfMeasure::create($request->validated());
 
         return to_route('master.procurement.units-of-measure.index')
-            ->with('success', 'Unit of Measure berhasil dibuat.');
+            ->with('success', 'Unit of Measure was created successfully.');
     }
 
     public function edit(
@@ -78,7 +78,7 @@ class UnitOfMeasureController extends Controller
         $unitsOfMeasure->update($request->validated());
 
         return to_route('master.procurement.units-of-measure.index')
-            ->with('success', 'Unit of Measure berhasil diperbarui.');
+            ->with('success', 'Unit of Measure was updated successfully.');
     }
 
     public function destroy(
@@ -87,6 +87,6 @@ class UnitOfMeasureController extends Controller
         $unitsOfMeasure->delete();
 
         return to_route('master.procurement.units-of-measure.index')
-            ->with('success', 'Unit of Measure berhasil dihapus.');
+            ->with('success', 'Unit of Measure was deleted successfully.');
     }
 }

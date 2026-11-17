@@ -2,9 +2,11 @@
 
 namespace App\Http\Middleware;
 
-use Illuminate\Http\Request;
-use Inertia\Middleware;
+use App\Services\MenuVisibilityService;
 use App\Services\SettingService;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
+use Inertia\Middleware;
 
 class HandleInertiaRequests extends Middleware
 {
@@ -37,15 +39,28 @@ class HandleInertiaRequests extends Middleware
     public function share(Request $request): array
     {
         $settings = app(SettingService::class);
+        $logoPath = $settings->get('system.logo_path');
 
         return [
             ...parent::share($request),
 
             'app' => [
                 'name' => $settings->get(
-                    'company.name',
-                    'ERP Platform',
+                    'system.name',
+                    $settings->get(
+                        'company.name',
+                        config('app.name'),
+                    ),
                 ),
+
+                'company_name' => $settings->get(
+                    'company.name',
+                    config('app.name'),
+                ),
+
+                'logo_url' => is_string($logoPath) && $logoPath !== ''
+                    ? Storage::disk('public')->url($logoPath)
+                    : null,
 
                 'email' => $settings->get(
                     'company.email',
@@ -78,18 +93,37 @@ class HandleInertiaRequests extends Middleware
                 ),
             ],
 
+            'csrf_token' => csrf_token(),
+
             'auth' => [
                 'user' => $request->user(),
+                'is_administrator' => $request->user()?->hasGlobalDepartmentAccess() ?? false,
+                'menu_visibility' => fn () => $request->user() === null
+                    ? null
+                    : app(MenuVisibilityService::class)->visibleMenuKeysFor($request->user()),
+                'permissions' => fn () => $request->user()
+                    ?->getAllPermissions()
+                    ->pluck('name')
+                    ->values()
+                    ->all() ?? [],
             ],
 
             'flash' => [
-                'success' => fn() => $request
+                'success' => fn () => $request
                     ->session()
                     ->get('success'),
 
-                'error' => fn() => $request
+                'error' => fn () => $request
                     ->session()
                     ->get('error'),
+
+                'warning' => fn () => $request
+                    ->session()
+                    ->get('warning'),
+
+                'info' => fn () => $request
+                    ->session()
+                    ->get('info'),
             ],
         ];
     }

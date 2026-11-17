@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import CrudForm from "@/components/crud/CrudForm.vue";
-import AppLayout from "@/layouts/AppLayout.vue";
+import AppLayout from "@/layout/AppLayout.vue";
+import MasterActiveToggle from "@/components/common/MasterActiveToggle.vue";
 import { Head, useForm } from "@inertiajs/vue3";
 import { route } from "ziggy-js";
+import { useMasterFieldFormatting } from "@/composables/useMasterFieldFormatting";
 
 defineOptions({
     layout: AppLayout,
@@ -33,6 +35,8 @@ const form = useForm({
     name: props.costCenter.name,
     is_active: Boolean(props.costCenter.is_active),
 });
+
+useMasterFieldFormatting(form);
 
 const submit = () => {
     form.put(
@@ -100,7 +104,7 @@ const cancel = () => {
                     v-model="form.code"
                     type="text"
                     class="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 text-sm text-gray-800 outline-none focus:border-blue-500 dark:border-gray-700 dark:text-white"
-                />
+                :disabled="true" />
 
                 <p v-if="form.errors.code" class="mt-1 text-sm text-red-500">
                     {{ form.errors.code }}
@@ -129,25 +133,10 @@ const cancel = () => {
         </div>
 
         <div>
-            <label
-                for="is_active"
-                class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300"
-            >
-                Status
-            </label>
-
-            <select
-                id="is_active"
+            <MasterActiveToggle
                 v-model="form.is_active"
-                class="h-11 w-full rounded-lg border border-gray-300 bg-white px-4 text-sm text-gray-800 outline-none focus:border-blue-500 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
-            >
-                <option :value="true">Active</option>
-                <option :value="false">Inactive</option>
-            </select>
-
-            <p v-if="form.errors.is_active" class="mt-1 text-sm text-red-500">
-                {{ form.errors.is_active }}
-            </p>
+                :error="form.errors.is_active"
+            />
         </div>
     </CrudForm>
 </template>

@@ -65,7 +65,7 @@ class DepartmentController extends Controller
         Department::create($request->validated());
 
         return to_route('master.organization.departments.index')
-            ->with('success', 'Department berhasil dibuat.');
+            ->with('success', 'Department was created successfully.');
     }
 
     public function edit(Department $department): Response
@@ -90,7 +90,7 @@ class DepartmentController extends Controller
         $department->update($request->validated());
 
         return to_route('master.organization.departments.index')
-            ->with('success', 'Department berhasil diperbarui.');
+            ->with('success', 'Department was updated successfully.');
     }
 
     public function destroy(
@@ -99,6 +99,6 @@ class DepartmentController extends Controller
         $department->delete();
 
         return to_route('master.organization.departments.index')
-            ->with('success', 'Department berhasil dihapus.');
+            ->with('success', 'Department was deleted successfully.');
     }
 }

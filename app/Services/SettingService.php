@@ -15,7 +15,7 @@ class SettingService
         mixed $default = null,
     ): mixed {
         return Cache::rememberForever(
-            self::CACHE_PREFIX . $key,
+            self::CACHE_PREFIX.$key,
             function () use ($key, $default) {
                 $setting = Setting::where('key', $key)->first();
 
@@ -67,16 +67,20 @@ class SettingService
             ],
         );
 
-        Cache::forget(self::CACHE_PREFIX . $key);
+        Cache::forget(self::CACHE_PREFIX.$key);
 
         return $setting;
     }
 
     public function forget(string $key): void
     {
-        Setting::where('key', $key)->delete();
+        Setting::query()
+            ->where('key', $key)
+            ->get()
+            ->each
+            ->delete();
 
-        Cache::forget(self::CACHE_PREFIX . $key);
+        Cache::forget(self::CACHE_PREFIX.$key);
     }
 
     public function allPublic(): array

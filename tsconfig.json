@@ -11,7 +11,14 @@
         "strict": true,
         "noEmit": true,
         "lib": ["ES2022", "DOM", "DOM.Iterable"],
-        "types": ["vite/client"]
+        "types": ["vite/client"],
+        
+        /* --- TAMBAHKAN BAGIAN INI --- */
+        "baseUrl": ".",
+        "paths": {
+            "@/*": ["resources/js/*"]
+        }
+        /* -------------------------- */
     },
     "include": [
         "resources/js/**/*.ts",

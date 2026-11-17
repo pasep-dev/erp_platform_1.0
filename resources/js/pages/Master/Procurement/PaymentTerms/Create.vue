@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { Head, useForm } from "@inertiajs/vue3";
 import { route } from "ziggy-js";
+import { useMasterFieldFormatting } from "@/composables/useMasterFieldFormatting";
 
-import AppLayout from "@/layouts/AppLayout.vue";
+import AppLayout from "@/layout/AppLayout.vue";
+import MasterActiveToggle from "@/components/common/MasterActiveToggle.vue";
 import CrudForm from "@/components/crud/CrudForm.vue";
 
 defineOptions({
@@ -16,6 +18,8 @@ const form = useForm({
     description: "",
     is_active: true,
 });
+
+useMasterFieldFormatting(form);
 
 function submit(): void {
     form.post(route("master.procurement.payment-terms.store"));
@@ -32,6 +36,9 @@ const cancel = () => {
 
         <CrudForm
             title="Create Payment Term"
+            header-variant="procurement"
+            header-section="Master Data"
+            description="Tambahkan ketentuan pembayaran untuk transaksi vendor."
             :form="form"
             submit-label="Save"
             :cancel-url="route('master.procurement.payment-terms.index')"
@@ -144,28 +151,10 @@ const cancel = () => {
                 </div>
 
                 <div class="md:col-span-2">
-                    <label
-                        class="inline-flex cursor-pointer items-center gap-3"
-                    >
-                        <input
-                            v-model="form.is_active"
-                            type="checkbox"
-                            class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                        />
-
-                        <span
-                            class="text-sm font-medium text-gray-700 dark:text-gray-300"
-                        >
-                            Active
-                        </span>
-                    </label>
-
-                    <p
-                        v-if="form.errors.is_active"
-                        class="mt-1 text-sm text-red-500"
-                    >
-                        {{ form.errors.is_active }}
-                    </p>
+                    <MasterActiveToggle
+                        v-model="form.is_active"
+                        :error="form.errors.is_active"
+                    />
                 </div>
             </div>
         </CrudForm>

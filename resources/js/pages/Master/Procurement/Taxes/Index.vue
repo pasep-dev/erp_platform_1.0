@@ -1,15 +1,15 @@
 <script setup lang="ts">
 import { ref } from "vue";
 import { Link, router, Head } from "@inertiajs/vue3";
-import { Search } from "lucide-vue-next";
 import { route } from "ziggy-js";
 
-import AppLayout from "@/layouts/AppLayout.vue";
+import AppLayout from "@/layout/AppLayout.vue";
 import CrudActions from "@/components/crud/CrudActions.vue";
 import CrudTable from "@/components/crud/CrudTable.vue";
 import DeleteConfirm from "@/components/crud/DeleteConfirm.vue";
 import { useCrud } from "@/composables/useCrud";
-import Header from "@/components/content/Header.vue";
+import SearchFilterBar from "@/components/common/SearchFilterBar.vue";
+import ProcurementPageHeader from "@/components/procurement/ProcurementPageHeader.vue";
 
 defineOptions({
     layout: AppLayout,
@@ -130,13 +130,14 @@ function confirmDelete(): void {
 </script>
 
 <template>
-    <Head title="Master - Tax" />
-
-    <div class="space-y-6">
-        <Header
-            title="Tax"
+    <Head title="Pajak" />
+    <div class="procurement-ui space-y-6">
+        <ProcurementPageHeader
+            title="Pajak"
+            section="Master Data"
+            description="Kelola tarif pajak yang dapat diterapkan pada pengadaan."
             :action-url="route('master.procurement.taxes.create')"
-            action-label="Add New"
+            action-label="Tambah Pajak"
         />
 
         <div
@@ -145,43 +146,13 @@ function confirmDelete(): void {
             <div
                 class="flex flex-col gap-3 border-b border-gray-200 p-4 sm:flex-row sm:items-center sm:justify-between dark:border-gray-800"
             >
-                <form
-                    class="flex w-full flex-col gap-2 sm:max-w-md sm:flex-row"
-                    @submit.prevent="submitSearch"
-                >
-                    <div class="relative flex-1">
-                        <Search
-                            class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400"
-                        />
-
-                        <input
-                            v-model="search"
-                            type="search"
-                            placeholder="Cari kode, nama, atau description..."
-                            class="h-10 w-full rounded-lg border border-gray-300 bg-transparent pl-9 pr-3 text-sm text-gray-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 dark:border-gray-700 dark:text-white"
-                        />
-                    </div>
-
-                    <button
-                        type="submit"
-                        class="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-white/[0.05]"
-                    >
-                        Cari
-                    </button>
-
-                    <button
-                        v-if="search"
-                        type="button"
-                        class="rounded-lg px-3 py-2 text-sm text-gray-500 hover:bg-gray-100 dark:hover:bg-white/[0.05]"
-                        @click="clearSearch"
-                    >
-                        Reset
-                    </button>
-                </form>
-
-                <div class="text-sm text-gray-500 dark:text-gray-400">
-                    Total: {{ taxes.total }}
-                </div>
+                <SearchFilterBar
+                    v-model="search"
+                    :total="taxes.total"
+                    placeholder="Cari data..."
+                    @search="submitSearch"
+                    @clear="clearSearch"
+                />
             </div>
 
             <CrudTable
@@ -223,6 +194,7 @@ function confirmDelete(): void {
 
                 <template #actions="{ row }">
                     <CrudActions
+                        variant="procurement"
                         :processing="processing"
                         @edit="
                             router.visit(

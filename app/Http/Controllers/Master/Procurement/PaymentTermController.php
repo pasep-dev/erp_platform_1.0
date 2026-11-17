@@ -58,7 +58,7 @@ class PaymentTermController extends Controller
         PaymentTerm::create($request->validated());
 
         return to_route('master.procurement.payment-terms.index')
-            ->with('success', 'Payment Term berhasil dibuat.');
+            ->with('success', 'Payment Term was created successfully.');
     }
 
     public function edit(
@@ -79,7 +79,7 @@ class PaymentTermController extends Controller
         $paymentTerm->update($request->validated());
 
         return to_route('master.procurement.payment-terms.index')
-            ->with('success', 'Payment Term berhasil diperbarui.');
+            ->with('success', 'Payment Term was updated successfully.');
     }
 
     public function destroy(
@@ -88,6 +88,6 @@ class PaymentTermController extends Controller
         $paymentTerm->delete();
 
         return to_route('master.procurement.payment-terms.index')
-            ->with('success', 'Payment Term berhasil dihapus.');
+            ->with('success', 'Payment Term was deleted successfully.');
     }
 }

@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { Head, useForm } from "@inertiajs/vue3";
 import { route } from "ziggy-js";
+import { useMasterFieldFormatting } from "@/composables/useMasterFieldFormatting";
 
-import AppLayout from "@/layouts/AppLayout.vue";
+import AppLayout from "@/layout/AppLayout.vue";
+import MasterActiveToggle from "@/components/common/MasterActiveToggle.vue";
 import CrudForm from "@/components/crud/CrudForm.vue";
 
 defineOptions({
@@ -30,6 +32,8 @@ const form = useForm({
     is_active: props.tax.is_active,
 });
 
+useMasterFieldFormatting(form);
+
 function submit(): void {
     form.put(route("master.procurement.taxes.update", props.tax.id));
 }
@@ -46,6 +50,9 @@ const cancel = () => {
         <CrudForm
             :form="form"
             title="Edit Tax"
+            header-variant="procurement"
+            header-section="Master Data"
+            description="Perbarui tarif dan informasi pajak yang tersimpan."
             submit-label="Save"
             :cancel-url="route('master.procurement.taxes.index')"
             submit-processing-label="Updating..."
@@ -68,7 +75,7 @@ const cancel = () => {
                         type="text"
                         placeholder="Contoh: VAT"
                         class="w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 dark:border-gray-700 dark:text-white"
-                    />
+                    :disabled="true" />
 
                     <p
                         v-if="form.errors.code"
@@ -158,28 +165,10 @@ const cancel = () => {
                 </div>
 
                 <div class="md:col-span-2">
-                    <label
-                        class="inline-flex cursor-pointer items-center gap-3"
-                    >
-                        <input
-                            v-model="form.is_active"
-                            type="checkbox"
-                            class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                        />
-
-                        <span
-                            class="text-sm font-medium text-gray-700 dark:text-gray-300"
-                        >
-                            Active
-                        </span>
-                    </label>
-
-                    <p
-                        v-if="form.errors.is_active"
-                        class="mt-1 text-sm text-red-500"
-                    >
-                        {{ form.errors.is_active }}
-                    </p>
+                    <MasterActiveToggle
+                        v-model="form.is_active"
+                        :error="form.errors.is_active"
+                    />
                 </div>
             </div>
         </CrudForm>

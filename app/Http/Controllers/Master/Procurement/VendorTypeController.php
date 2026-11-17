@@ -5,8 +5,11 @@ namespace App\Http\Controllers\Master\Procurement;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Master\Procurement\VendorTypeRequest;
 use App\Models\Master\Procurement\VendorType;
+use App\Models\NumberingDocument;
+use App\Services\NumberingService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -50,13 +53,33 @@ class VendorTypeController extends Controller
     /**
      * Store a newly created vendor type.
      */
-    public function store(VendorTypeRequest $request): RedirectResponse
-    {
-        VendorType::create($request->validated());
+    public function store(
+        VendorTypeRequest $request,
+        NumberingService $numberingService,
+    ): RedirectResponse {
+        $data = $request->validated();
+
+        if (blank($data['code'] ?? null)) {
+            if (! $numberingService->hasActiveDocument(NumberingDocument::CODE_VENDOR_TYPE)) {
+                throw ValidationException::withMessages([
+                    'code' => 'Enter a vendor type code or configure an active VENDOR_TYPE numbering rule.',
+                ]);
+            }
+
+            $data['code'] = $numberingService->generate(NumberingDocument::CODE_VENDOR_TYPE);
+
+            if (VendorType::withTrashed()->where('code', $data['code'])->exists()) {
+                throw ValidationException::withMessages([
+                    'code' => 'Generated vendor type code already exists. Update the numbering sequence start.',
+                ]);
+            }
+        }
+
+        VendorType::create($data);
 
         return redirect()
             ->route('master.procurement.vendor-types.index')
-            ->with('success', 'Vendor type berhasil ditambahkan.');
+            ->with('success', 'Vendor type was added successfully.');
     }
 
     /**
@@ -80,7 +103,7 @@ class VendorTypeController extends Controller
 
         return redirect()
             ->route('master.procurement.vendor-types.index')
-            ->with('success', 'Vendor type berhasil diperbarui.');
+            ->with('success', 'Vendor type was updated successfully.');
     }
 
     /**
@@ -92,6 +115,6 @@ class VendorTypeController extends Controller
 
         return redirect()
             ->route('master.procurement.vendor-types.index')
-            ->with('success', 'Vendor type berhasil dihapus.');
+            ->with('success', 'Vendor type was deleted successfully.');
     }
 }

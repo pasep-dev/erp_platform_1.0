@@ -11,6 +11,15 @@ use RuntimeException;
 
 class NumberingService
 {
+    public function hasActiveDocument(string $documentCode): bool
+    {
+        return NumberingDocument::query()
+            ->whereHas('module', fn ($query) => $query->where('is_active', true))
+            ->where('code', $documentCode)
+            ->where('is_active', true)
+            ->exists();
+    }
+
     /**
      * Generate a business number based on a numbering rule.
      *
@@ -28,6 +37,7 @@ class NumberingService
             $now,
         ): string {
             $document = NumberingDocument::query()
+                ->whereHas('module', fn ($query) => $query->where('is_active', true))
                 ->where('code', $documentCode)
                 ->where('is_active', true)
                 ->first();
@@ -55,11 +65,10 @@ class NumberingService
                 $now,
             );
 
-            /*
-             * Create the sequence row if it does not exist.
-             *
-             * PostgreSQL handles the unique conflict using upsert.
-             * This avoids duplicate sequence rows during concurrent requests.
+            /**
+             * Numbering sequences are technical counters and are intentionally excluded from
+             * per-model activity logs; the business document receiving the number is audited.
+             * PostgreSQL handles the unique conflict using upsert to avoid duplicate rows.
              */
             NumberingSequence::query()->upsert(
                 [
@@ -68,7 +77,7 @@ class NumberingService
                         'numbering_document_id' => $document->id,
                         'scope_key' => $scopeKey,
                         'period_key' => $periodKey,
-                        'current_value' => 0,
+                        'current_value' => $document->sequence_start - 1,
                         'created_at' => $now,
                         'updated_at' => $now,
                     ],
@@ -110,20 +119,12 @@ class NumberingService
     ): string {
         $scopeParts = [];
 
-        foreach (
-            [
-                'COMPANY',
-                'ASSET_TYPE',
-                'BRANCH',
-                'DOCUMENT_TYPE',
-                'DEPARTMENT',
-            ] as $placeholder
-        ) {
-            $token = '{' . $placeholder . '}';
+        foreach (NumberingDocument::SCOPE_PLACEHOLDERS as $placeholder) {
+            $token = '{'.$placeholder.'}';
 
             if (str_contains($pattern, $token)) {
-                $scopeParts[] = $placeholder . '='
-                    . (string) $parameters[strtolower($placeholder)];
+                $scopeParts[] = $placeholder.'='
+                    .(string) $parameters[strtolower($placeholder)];
             }
         }
 
@@ -158,21 +159,12 @@ class NumberingService
 
         $placeholders = array_unique($matches[1]);
 
-        $supportedPlaceholders = [
-            'YYYY',
-            'YY',
-            'MM',
-            'DD',
-            'SEQ',
-            'COMPANY',
-            'ASSET_TYPE',
-            'BRANCH',
-            'DOCUMENT_TYPE',
-            'DEPARTMENT',
-        ];
-
         foreach ($placeholders as $placeholder) {
-            if (! in_array($placeholder, $supportedPlaceholders, true)) {
+            if (! in_array(
+                $placeholder,
+                NumberingDocument::SUPPORTED_PLACEHOLDERS,
+                true,
+            )) {
                 throw new RuntimeException(
                     "Unsupported numbering placeholder [{$placeholder}].",
                 );
@@ -224,16 +216,8 @@ class NumberingService
             '{SEQ}' => $sequenceNumber,
         ];
 
-        foreach (
-            [
-                'COMPANY',
-                'ASSET_TYPE',
-                'BRANCH',
-                'DOCUMENT_TYPE',
-                'DEPARTMENT',
-            ] as $placeholder
-        ) {
-            $token = '{' . $placeholder . '}';
+        foreach (NumberingDocument::SCOPE_PLACEHOLDERS as $placeholder) {
+            $token = '{'.$placeholder.'}';
             $parameterKey = strtolower($placeholder);
 
             if (str_contains($pattern, $token)) {

@@ -2,16 +2,14 @@
 
 namespace App\Http\Requests\Master\Organization;
 
+use App\Http\Requests\Master\AuthorizesMasterData;
 use App\Models\Master\Organization\Branch;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
 class BranchRequest extends FormRequest
 {
-    public function authorize(): bool
-    {
-        return $this->user() !== null;
-    }
+    use AuthorizesMasterData;
 
     public function rules(): array
     {

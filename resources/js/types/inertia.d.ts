@@ -20,11 +20,16 @@ interface AuthContext {
         last_login_at: string | null;
         last_login_ip: string | null;
     } | null;
+    is_administrator: boolean;
+    permissions: string[];
+    menu_visibility: string[] | null;
 }
 
 interface FlashContext {
     success?: string | null;
     error?: string | null;
+    warning?: string | null;
+    info?: string | null;
 }
 
 declare module '@inertiajs/core' {

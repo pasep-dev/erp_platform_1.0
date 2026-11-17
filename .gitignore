@@ -18,6 +18,7 @@
 /public/fonts-manifest.dev.json
 /public/hot
 /public/storage
+/database-backups/
 /storage/*.key
 /storage/pail
 /vendor
@@ -25,3 +26,31 @@ _ide_helper.php
 Homestead.json
 Homestead.yaml
 Thumbs.db
+# Laravel runtime files
+/storage/app/private/*
+!/storage/app/private/.gitignore
+
+/storage/framework/cache/*
+!/storage/framework/cache/.gitignore
+
+/storage/framework/sessions/*
+!/storage/framework/sessions/.gitignore
+
+/storage/framework/testing/*
+!/storage/framework/testing/.gitignore
+
+/storage/framework/views/*
+!/storage/framework/views/.gitignore
+
+/storage/logs/*
+!/storage/logs/.gitignore
+
+# Database backup
+/database-backups/
+*.dump
+
+# Environment and local tool configuration
+.env
+.env.*
+!.env.example
+.mcp.json

@@ -57,7 +57,7 @@ class TaxController extends Controller
         Tax::create($request->validated());
 
         return to_route('master.procurement.taxes.index')
-            ->with('success', 'Tax berhasil dibuat.');
+            ->with('success', 'Tax was created successfully.');
     }
 
     public function edit(
@@ -78,7 +78,7 @@ class TaxController extends Controller
         $tax->update($request->validated());
 
         return to_route('master.procurement.taxes.index')
-            ->with('success', 'Tax berhasil diperbarui.');
+            ->with('success', 'Tax was updated successfully.');
     }
 
     public function destroy(
@@ -87,6 +87,6 @@ class TaxController extends Controller
         $tax->delete();
 
         return to_route('master.procurement.taxes.index')
-            ->with('success', 'Tax berhasil dihapus.');
+            ->with('success', 'Tax was deleted successfully.');
     }
 }

@@ -2,16 +2,14 @@
 
 namespace App\Http\Requests\Master\Procurement;
 
+use App\Http\Requests\Master\AuthorizesMasterData;
 use App\Models\Master\Procurement\Vendor;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
 class VendorRequest extends FormRequest
 {
-    public function authorize(): bool
-    {
-        return $this->user() !== null;
-    }
+    use AuthorizesMasterData;
 
     public function rules(): array
     {
@@ -42,7 +40,7 @@ class VendorRequest extends FormRequest
             ],
 
             'code' => [
-                'required',
+                $this->isMethod('POST') ? 'nullable' : 'required',
                 'string',
                 'max:50',
                 'alpha_dash',

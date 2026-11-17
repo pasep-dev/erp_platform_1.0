@@ -2,17 +2,19 @@
 
 namespace App\Models\Master\Organization;
 
+use App\Models\Concerns\HasBranchAccessScope;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Location extends Model
 {
+    use HasBranchAccessScope;
     use HasUlids;
     use SoftDeletes;
 
-    protected $table = "mst_org_locations";
+    protected $table = 'mst_org_locations';
 
     protected $fillable = [
         'company_id',

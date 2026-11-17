@@ -2,17 +2,32 @@
 import { usePage } from "@inertiajs/vue3";
 import miniSvg from "@/../images/logo/citra-logo.svg";
 
-const page = usePage();
+const page = usePage<{
+    app: {
+        name: string;
+        company_name: string;
+        logo_url: string | null;
+    };
+}>();
 </script>
 
 <template>
     <main class="guest-page">
-        <section class="guest-brand-panel" aria-label="Citra Group">
+        <section
+            class="guest-brand-panel"
+            :aria-label="page.props.app.company_name"
+        >
             <div class="guest-brand-lockup">
                 <span class="guest-brand-logo-frame">
-                    <img :src="miniSvg" alt="" class="guest-brand-logo" />
+                    <img
+                        :src="page.props.app.logo_url ?? miniSvg"
+                        alt=""
+                        class="guest-brand-logo"
+                    />
                 </span>
-                <span class="guest-brand-name">CITRA GROUP</span>
+                <!-- <span class="guest-brand-name">
+                    {{ page.props.app.company_name }}
+                </span> -->
             </div>
 
             <div class="guest-brand-message">

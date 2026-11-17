@@ -11,7 +11,7 @@ class NumberingSeeder extends Seeder
     {
         $documents = [
             [
-                'code' => 'ASSET',
+                'code' => NumberingDocument::CODE_ASSET,
                 'name' => 'Asset Number',
                 'pattern' => '{COMPANY}-{ASSET_TYPE}{SEQ}{BRANCH}',
                 'sequence_length' => 3,
@@ -19,7 +19,7 @@ class NumberingSeeder extends Seeder
                 'is_active' => true,
             ],
             [
-                'code' => 'PURCHASE_REQUEST',
+                'code' => NumberingDocument::CODE_PURCHASE_REQUEST,
                 'name' => 'Purchase Request',
                 'pattern' => '{COMPANY}/{DOCUMENT_TYPE}/{DEPARTMENT}/{YYYY}/{SEQ}',
                 'sequence_length' => 3,
@@ -27,7 +27,7 @@ class NumberingSeeder extends Seeder
                 'is_active' => true,
             ],
             [
-                'code' => 'PURCHASE_ORDER',
+                'code' => NumberingDocument::CODE_PURCHASE_ORDER,
                 'name' => 'Purchase Order',
                 'pattern' => '{COMPANY}/{DOCUMENT_TYPE}/{DEPARTMENT}/{YYYY}/{SEQ}',
                 'sequence_length' => 3,
@@ -35,7 +35,7 @@ class NumberingSeeder extends Seeder
                 'is_active' => true,
             ],
             [
-                'code' => 'GOODS_RECEIPT',
+                'code' => NumberingDocument::CODE_GOODS_RECEIPT,
                 'name' => 'Goods Receipt',
                 'pattern' => '{COMPANY}/{DOCUMENT_TYPE}/{DEPARTMENT}/{YYYY}/{SEQ}',
                 'sequence_length' => 3,

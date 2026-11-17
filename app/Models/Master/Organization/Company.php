@@ -2,17 +2,18 @@
 
 namespace App\Models\Master\Organization;
 
+use App\Models\Position;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Company extends Model
 {
-    use HasUlids;
-    use SoftDeletes;
+    use HasFactory, HasUlids, SoftDeletes;
 
-    protected $table = "mst_org_companies";
+    protected $table = 'mst_org_companies';
 
     protected $fillable = [
         'code',
@@ -46,5 +47,10 @@ class Company extends Model
     public function costCenters(): HasMany
     {
         return $this->hasMany(CostCenter::class);
+    }
+
+    public function positions(): HasMany
+    {
+        return $this->hasMany(Position::class);
     }
 }

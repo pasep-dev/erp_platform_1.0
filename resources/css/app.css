@@ -1,17 +1,207 @@
-@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap');
 @import "tailwindcss";
+@plugin 'tailwindcss-primeui';
 
-@custom-variant dark (&:where(.dark, .dark *));
+@custom-variant dark (&:where(.app-dark, .app-dark *));
 
 @source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
 @source '../../storage/framework/views/*.php';
+
+@theme {
+    --font-sans: 'Public Sans', sans-serif;
+    --text-xs: var(--app-font-size-xs);
+    --text-xs--line-height: 1rem;
+    --text-sm: var(--app-font-size-sm);
+    --text-sm--line-height: 1.25rem;
+
+    --color-citra-purple: var(--p-primary-color);
+    --color-brand-50: var(--p-primary-50);
+    --color-brand-100: var(--p-primary-100);
+    --color-brand-200: var(--p-primary-200);
+    --color-brand-300: var(--p-primary-300);
+    --color-brand-400: var(--p-primary-400);
+    --color-brand-500: var(--p-primary-500);
+    --color-brand-600: var(--p-primary-600);
+    --color-brand-700: var(--p-primary-color);
+    --color-brand-800: var(--p-primary-hover-color);
+    --color-brand-900: var(--p-primary-900);
+    --color-brand-950: var(--p-primary-950);
+
+    --color-primary-50: var(--p-primary-50);
+    --color-primary-100: var(--p-primary-100);
+    --color-primary-200: var(--p-primary-200);
+    --color-primary-300: var(--p-primary-300);
+    --color-primary-400: var(--p-primary-400);
+    --color-primary-500: var(--p-primary-500);
+    --color-primary-600: var(--p-primary-600);
+    --color-primary-700: var(--p-primary-700);
+    --color-primary-800: var(--p-primary-800);
+    --color-primary-900: var(--p-primary-900);
+    --color-primary-950: var(--p-primary-950);
+
+    --color-neutral-50: var(--app-neutral-50);
+    --color-neutral-100: var(--app-neutral-100);
+    --color-neutral-200: var(--app-neutral-200);
+    --color-neutral-300: var(--app-neutral-300);
+    --color-neutral-400: var(--app-neutral-400);
+    --color-neutral-500: var(--app-neutral-500);
+    --color-neutral-600: var(--app-neutral-600);
+    --color-neutral-700: var(--app-neutral-700);
+    --color-neutral-800: var(--app-neutral-800);
+    --color-neutral-900: var(--app-neutral-900);
+    --color-neutral-950: var(--app-neutral-950);
+
+    --color-success-50: var(--app-success-soft);
+    --color-success-100: var(--app-success-muted);
+    --color-success-500: var(--app-success);
+    --color-success-600: var(--app-success-strong);
+    --color-success-700: var(--app-success-strong);
+
+    --color-warning-50: var(--app-warning-soft);
+    --color-warning-100: var(--app-warning-muted);
+    --color-warning-500: var(--app-warning);
+    --color-warning-600: var(--app-warning-strong);
+    --color-warning-700: var(--app-warning-strong);
+
+    --color-error-50: var(--app-danger-soft);
+    --color-error-100: var(--app-danger-muted);
+    --color-error-500: var(--app-danger);
+    --color-error-600: var(--app-danger-strong);
+    --color-error-700: var(--app-danger-strong);
+
+    --color-info-50: var(--app-info-soft);
+    --color-info-100: var(--app-info-muted);
+    --color-info-500: var(--app-info);
+    --color-info-600: var(--app-info-strong);
+    --color-info-700: var(--app-info-strong);
+
+    --color-accent-50: var(--app-info-soft);
+    --color-accent-100: var(--app-info-muted);
+    --color-accent-200: var(--app-info-muted);
+    --color-accent-300: var(--app-info);
+    --color-accent-400: var(--app-info);
+    --color-accent-500: var(--app-info);
+    --color-accent-600: var(--app-info-strong);
+    --color-accent-700: var(--app-info-strong);
+    --color-accent-800: var(--app-info-strong);
+    --color-accent-900: var(--app-info-strong);
+    --color-accent-950: var(--app-info-strong);
+
+    --radius-card: var(--app-radius-card);
+    --radius-control: var(--app-radius-control);
+    --shadow-card: var(--app-shadow-card);
+    --spacing-card: var(--app-spacing-card);
+
+    --breakpoint-*: initial;
+    --breakpoint-2xsm: 375px;
+    --breakpoint-xsm: 425px;
+    --breakpoint-sm: 640px;
+    --breakpoint-md: 768px;
+    --breakpoint-lg: 992px;
+    --breakpoint-xl: 1200px;
+    --breakpoint-2xl: 1920px;
+    --breakpoint-3xl: 2000px;
+}
+
+:root {
+    --app-primary-soft: color-mix(in srgb, var(--p-primary-color), white 84%);
+    --app-page-background: #f5f5f9;
+    --app-surface: #ffffff;
+    --app-surface-raised: #ffffff;
+    --app-border: #e7e7f0;
+    --app-text-primary: #384551;
+    --app-text-secondary: #6f7784;
+    --app-text-muted: #9299a5;
+
+    --app-success: #71dd37;
+    --app-success-strong: #4ca91f;
+    --app-success-soft: #e8f9df;
+    --app-success-muted: #d7f4c9;
+    --app-info: #03c3ec;
+    --app-info-strong: #0097b8;
+    --app-info-soft: #d6f5fc;
+    --app-info-muted: #c4eef8;
+    --app-warning: #ff9f43;
+    --app-warning-strong: #d97812;
+    --app-warning-soft: #fff2d6;
+    --app-warning-muted: #ffe5b2;
+    --app-danger: #ff3e1d;
+    --app-danger-strong: #d92d13;
+    --app-danger-soft: #ffe0db;
+    --app-danger-muted: #ffc9c0;
+
+    --app-neutral-50: #f5f5f9;
+    --app-neutral-100: #f2f2f6;
+    --app-neutral-200: #e7e7f0;
+    --app-neutral-300: #d8dbe2;
+    --app-neutral-400: #a1a7b2;
+    --app-neutral-500: #737b88;
+    --app-neutral-600: #5d6673;
+    --app-neutral-700: #4c5663;
+    --app-neutral-800: #384551;
+    --app-neutral-900: #2b3440;
+    --app-neutral-950: #1d252e;
+
+    --app-font-size-xs: 0.9375rem;
+    --app-font-size-sm: 0.9375rem;
+    --app-font-size-base: 1rem;
+    --app-font-size-lg: 1.125rem;
+    --app-font-size-xl: 1.25rem;
+    --app-font-size-2xl: 1.5rem;
+    --app-font-size-3xl: 1.875rem;
+    --app-space-1: 0.25rem;
+    --app-space-2: 0.5rem;
+    --app-space-3: 0.75rem;
+    --app-space-4: 1rem;
+    --app-space-6: 1.5rem;
+    --app-space-8: 2rem;
+
+    --app-radius-card: 0.5rem;
+    --app-radius-control: 0.375rem;
+    --app-radius-pill: 9999px;
+    --app-shadow-card: 0 2px 6px rgb(67 89 113 / 12%);
+    --app-spacing-card: 1.5rem;
+}
+
+:root.app-dark {
+    --app-primary-soft: color-mix(in srgb, var(--p-primary-color), transparent 84%);
+    --app-page-background: #25293c;
+    --app-surface: #2f3349;
+    --app-surface-raised: #34394f;
+    --app-border: #434968;
+    --app-text-primary: #e7e7f0;
+    --app-text-secondary: #b6bee3;
+    --app-text-muted: #8f9bba;
+
+    --app-success-soft: #263d31;
+    --app-success-muted: #2d513c;
+    --app-info-soft: #203a49;
+    --app-info-muted: #254a5c;
+    --app-warning-soft: #483b2c;
+    --app-warning-muted: #5b472e;
+    --app-danger-soft: #4b3038;
+    --app-danger-muted: #603741;
+
+    --app-neutral-50: #25293c;
+    --app-neutral-100: #2f3349;
+    --app-neutral-200: #434968;
+    --app-neutral-300: #535a7a;
+    --app-neutral-400: #7983bb;
+    --app-neutral-500: #aab1d1;
+    --app-neutral-600: #b6bee3;
+    --app-neutral-700: #c5c9e2;
+    --app-neutral-800: #d3d6f0;
+    --app-neutral-900: #e7e7f0;
+    --app-neutral-950: #f7f7ff;
+
+    --app-shadow-card: 0 2px 6px rgb(0 0 0 / 24%);
+}
 
 /* --- MENU UTAMA --- */
 @utility menu-item {
     @apply relative flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200;
 }
 
-/* Menu Active: Background Magenta Utama (#862885), Teks & Icon Putih */
+/* Menu Active */
 @utility menu-item-active {
     @apply bg-brand-700 text-white font-semibold shadow-sm dark:bg-brand-700 dark:text-white;
 }
@@ -20,13 +210,13 @@
     @apply text-white;
 }
 
-/* Menu Inactive / Hover: Teks Gray-Secondary, Hover Background Soft Tint (#FAF0FA) & Teks Magenta */
+/* Menu Inactive / Hover */
 @utility menu-item-inactive {
-    @apply text-[#5E5E70] hover:bg-[#FAF0FA] hover:text-brand-700 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-white;
+    @apply text-neutral-600 hover:bg-brand-50 hover:text-brand-700 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-white;
 }
 
 @utility menu-item-icon-inactive {
-    @apply text-[#5E5E70] group-hover:text-brand-700 dark:text-gray-400 dark:group-hover:text-white;
+    @apply text-neutral-600 group-hover:text-brand-700 dark:text-gray-400 dark:group-hover:text-white;
 }
 
 /* --- MENU DROPDOWN / SUBMENU --- */
@@ -39,50 +229,29 @@
 }
 
 @utility menu-dropdown-item-inactive {
-    @apply text-[#5E5E70] hover:bg-[#FAF0FA] hover:text-brand-700 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-white;
+    @apply text-neutral-600 hover:bg-brand-50 hover:text-brand-700 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-white;
 }
 
-@theme {
-  --font-sans: 'Outfit', sans-serif;
-  --font-outfit: 'Outfit', sans-serif;
-  --color-citra-purple: #862885;
+.btn-search {
+    background-color: var(--p-primary-color) !important;
+    border-color: var(--p-primary-color) !important;
+    color: #ffffff !important;
+}
 
-  /* Menyeting font size saja */
-  --text-tiny: 10px;
-  --text-logo-title: 23px;
+.btn-search:hover {
+    background-color: var(--p-primary-hover-color) !important;
+    border-color: var(--p-primary-hover-color) !important;
+}
 
-  /* Menyeting font size + line-height sekaligus (opsional) */
-  --text-badge: 10px;
-  --text-badge--line-height: 14px;
+.p-toast .p-toast-message.p-toast-message-success {
+    background: var(--app-success-strong) !important;
+    border-color: var(--app-success-strong) !important;
+    color: #ffffff !important;
+}
 
-  /* Skala warna presisi berdasarkan logo #862885 */
-  --color-brand-50: #fdf5fe;
-  --color-brand-100: #faebfc;
-  --color-brand-200: #f5d5f9;
-  --color-brand-300: #efb4f3;
-  --color-brand-400: #e688ea;
-  --color-brand-500: #d55adb;
-  --color-brand-600: #bc3abf;
-  --color-brand-700: #9e2d9e; /* WARNA UTAMA LOGO */
-  --color-brand-800: #862885;
-  --color-brand-900: #6a2568;
-  --color-brand-950: #450d43;
-
-  --color-one: #862885;
-  --color-two: #0891B2;
-  --color-bg-two: #E0F2FE;
-  --color-tree: #D97706;
-  --color-four: #059669;
-
-  --breakpoint-*: initial;
-  --breakpoint-2xsm: 375px;
-  --breakpoint-xsm: 425px;
-  --breakpoint-3xl: 2000px;
-  --breakpoint-sm: 640px;
-  --breakpoint-md: 768px;
-  --breakpoint-lg: 1024px;
-  --breakpoint-xl: 1280px;
-  --breakpoint-2xl: 1536px;
-
-  /* Sisa warna, shadow, & z-index kamu di bawah ini... */
+.p-toast .p-toast-message.p-toast-message-success .p-toast-summary,
+.p-toast .p-toast-message.p-toast-message-success .p-toast-detail,
+.p-toast .p-toast-message.p-toast-message-success .p-toast-message-icon,
+.p-toast .p-toast-message.p-toast-message-success .p-toast-close-button {
+    color: #ffffff !important;
 }

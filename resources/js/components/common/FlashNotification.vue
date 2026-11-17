@@ -1,11 +1,19 @@
 <script setup lang="ts">
-import { computed, ref, watch } from "vue";
+import { computed, onBeforeUnmount, ref, watch } from "vue";
 import { usePage } from "@inertiajs/vue3";
-import { CheckCircle, XCircle, X } from "lucide-vue-next";
+import {
+    CheckCircle,
+    CircleAlert,
+    Info,
+    TriangleAlert,
+    X,
+} from "lucide-vue-next";
 
 interface FlashProps {
     success?: string | null;
     error?: string | null;
+    warning?: string | null;
+    info?: string | null;
 }
 
 const page = usePage<{
@@ -13,7 +21,7 @@ const page = usePage<{
 }>();
 
 const visible = ref(false);
-const type = ref<"success" | "error">("success");
+const type = ref<"success" | "error" | "warning" | "info">("success");
 const message = ref("");
 
 let hideTimer: ReturnType<typeof setTimeout> | undefined;
@@ -21,7 +29,7 @@ let hideTimer: ReturnType<typeof setTimeout> | undefined;
 const flash = computed(() => page.props.flash);
 
 function showNotification(
-    notificationType: "success" | "error",
+    notificationType: "success" | "error" | "warning" | "info",
     notificationMessage: string,
 ): void {
     if (hideTimer) {
@@ -45,6 +53,42 @@ function closeNotification(): void {
     visible.value = false;
 }
 
+const notificationConfig = computed(() => {
+    const configurations = {
+        success: {
+            title: "Success",
+            icon: CheckCircle,
+            classes:
+                "border-green-700 bg-green-700 text-white dark:border-green-800 dark:bg-green-800",
+            closeClasses: "text-green-100 hover:bg-green-600 hover:text-white",
+        },
+        error: {
+            title: "Error",
+            icon: CircleAlert,
+            classes:
+                "border-red-700 bg-red-700 text-white dark:border-red-800 dark:bg-red-800",
+            closeClasses: "text-red-100 hover:bg-red-600 hover:text-white",
+        },
+        warning: {
+            title: "Warning",
+            icon: TriangleAlert,
+            classes:
+                "border-amber-700 bg-amber-700 text-white dark:border-amber-800 dark:bg-amber-800",
+            closeClasses:
+                "text-amber-100 hover:bg-amber-600 hover:text-white",
+        },
+        info: {
+            title: "Information",
+            icon: Info,
+            classes:
+                "border-blue-800 bg-blue-800 text-white dark:border-blue-900 dark:bg-blue-900",
+            closeClasses: "text-blue-100 hover:bg-blue-700 hover:text-white",
+        },
+    };
+
+    return configurations[type.value];
+});
+
 watch(
     () => flash.value.success,
     (value) => {
@@ -64,6 +108,32 @@ watch(
     },
     { immediate: true },
 );
+
+watch(
+    () => flash.value.warning,
+    (value) => {
+        if (value) {
+            showNotification("warning", value);
+        }
+    },
+    { immediate: true },
+);
+
+watch(
+    () => flash.value.info,
+    (value) => {
+        if (value) {
+            showNotification("info", value);
+        }
+    },
+    { immediate: true },
+);
+
+onBeforeUnmount(() => {
+    if (hideTimer) {
+        clearTimeout(hideTimer);
+    }
+});
 </script>
 
 <template>
@@ -77,43 +147,35 @@ watch(
     >
         <div
             v-if="visible"
-            class="fixed right-4 top-4 z-[9999] w-[calc(100%-2rem)] max-w-md rounded-xl border bg-white p-4 shadow-lg dark:bg-gray-900"
-            :class="
-                type === 'success'
-                    ? 'border-green-200 dark:border-green-500/30'
-                    : 'border-red-200 dark:border-red-500/30'
-            "
+            class="fixed right-4 top-4 z-[9999] w-[calc(100%-2rem)] max-w-md rounded-xl border p-4 shadow-lg"
+            :class="notificationConfig.classes"
             role="alert"
+            aria-live="assertive"
         >
             <div class="flex items-start gap-3">
-                <CheckCircle
-                    v-if="type === 'success'"
-                    class="mt-0.5 h-5 w-5 shrink-0 text-green-600 dark:text-green-400"
+                <component
+                    :is="notificationConfig.icon"
+                    class="mt-0.5 h-6 w-6 shrink-0"
+                    aria-hidden="true"
                 />
 
-                <XCircle
-                    v-else
-                    class="mt-0.5 h-5 w-5 shrink-0 text-red-600 dark:text-red-400"
-                />
-
-                <p
-                    class="flex-1 text-sm"
-                    :class="
-                        type === 'success'
-                            ? 'text-green-800 dark:text-green-300'
-                            : 'text-red-800 dark:text-red-300'
-                    "
-                >
-                    {{ message }}
-                </p>
+                <div class="min-w-0 flex-1">
+                    <p class="text-sm font-semibold">
+                        {{ notificationConfig.title }}
+                    </p>
+                    <p class="mt-0.5 text-sm leading-5">
+                        {{ message }}
+                    </p>
+                </div>
 
                 <button
                     type="button"
-                    class="rounded-md p-1 text-gray-400 transition hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-white/[0.05] dark:hover:text-gray-200"
-                    aria-label="Tutup notifikasi"
+                    class="rounded-md p-1 transition"
+                    :class="notificationConfig.closeClasses"
+                    aria-label="Close notification"
                     @click="closeNotification"
                 >
-                    <X class="h-4 w-4" />
+                    <X class="h-5 w-5" />
                 </button>
             </div>
         </div>

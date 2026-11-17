@@ -78,9 +78,12 @@ ketika mengubah presentasi.
 
 - Grafik dashboard dan library grafik baru tidak ditambahkan.
 - Kontrol topbar yang belum memiliki aksi tetap tidak diberi perilaku palsu.
-- Data fallback/demo dashboard tidak diubah menjadi sumber data baru.
-- Route, controller, validasi, props Inertia, database, izin, dan struktur menu
-tidak diubah oleh pekerjaan visual.
+- Data demo dashboard sudah diganti dengan agregat database yang dikirim melalui
+`DashboardDataService`; angka modul tetap dibatasi oleh izin pengguna dan
+visibilitas panel mengikuti izin yang sama (bukan nama role contoh); aktivitas
+terbaru hanya menampilkan aktivitas pengguna yang sedang masuk.
+- Integrasi data dashboard mempertahankan URL dan nama route yang ada. Tidak
+ada perubahan skema database, validasi, izin, atau struktur menu.
 - Audit visual runtime seluruh halaman, state dark/collapsed/mobile, dan seluruh
 menu masih memerlukan sesi aplikasi yang terautentikasi. Pada pemeriksaan
 Tahap 7, tab browser yang tersedia diarahkan ke halaman login.

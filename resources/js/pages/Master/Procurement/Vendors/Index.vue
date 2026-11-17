@@ -9,7 +9,7 @@ import CrudTable from "@/components/crud/CrudTable.vue";
 import DeleteConfirm from "@/components/crud/DeleteConfirm.vue";
 import { useCrud } from "@/composables/useCrud";
 import SearchFilterBar from "@/components/common/SearchFilterBar.vue";
-import Header from "@/components/content/Header.vue";
+import ProcurementPageHeader from "@/components/procurement/ProcurementPageHeader.vue";
 
 defineOptions({
     layout: AppLayout,
@@ -151,11 +151,14 @@ function confirmDelete(): void {
 </script>
 
 <template>
-    <div class="space-y-6">
-        <Header
-            title="Master Vendors"
-            :action-url="route('master.procurement.vendor.create')"
-            action-label="Add Vendor"
+    <Head title="Vendors" />
+    <div class="procurement-ui space-y-6">
+        <ProcurementPageHeader
+            title="Vendors"
+            section="Master Data"
+            description="Kelola data vendor yang digunakan pada proses pengadaan."
+            :action-url="route('master.procurement.vendors.create')"
+            action-label="Tambah Vendor"
         />
 
         <div
@@ -267,6 +270,7 @@ function confirmDelete(): void {
 
                 <template #actions="{ row }">
                     <CrudActions
+                        variant="procurement"
                         :processing="processing"
                         @edit="
                             router.visit(

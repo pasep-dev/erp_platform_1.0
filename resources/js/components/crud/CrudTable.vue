@@ -13,10 +13,12 @@ const props = withDefaults(
         rows: any[];
         rowKey?: string;
         emptyMessage?: string;
+        tableClass?: string;
     }>(),
     {
         rowKey: "id",
         emptyMessage: "Tidak ada data.",
+        tableClass: "",
     },
 );
 
@@ -25,7 +27,7 @@ const hasRows = computed(() => props.rows.length > 0);
 
 <template>
     <div class="overflow-x-auto">
-        <table class="min-w-full text-left text-sm">
+        <table class="min-w-full text-left text-sm" :class="tableClass">
             <thead
                 class="border-b border-gray-200 bg-gray-50 text-xs uppercase text-gray-500 dark:border-gray-800 dark:bg-white/[0.02] dark:text-gray-400"
             >
