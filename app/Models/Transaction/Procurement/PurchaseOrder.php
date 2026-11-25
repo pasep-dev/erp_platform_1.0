@@ -33,7 +33,7 @@ class PurchaseOrder extends Model
     use HasDepartmentAccessScope;
     use HasUlids;
 
-    protected $table = 'purchase_orders';
+    protected $table = 'trx_purchase_orders';
 
     protected $fillable = [
         'number',

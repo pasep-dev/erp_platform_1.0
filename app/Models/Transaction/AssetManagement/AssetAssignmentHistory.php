@@ -11,12 +11,15 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class AssetAssignmentHistory extends Model
 {
+    protected $table = 'trx_asset_assignment_histories';
+
     use HasBranchAccessScope;
     use HasDepartmentAccessScope;
     use HasUlids;
 
     protected $fillable = [
         'asset_id',
+        'number',
         'event_type',
         'from_condition',
         'to_condition',

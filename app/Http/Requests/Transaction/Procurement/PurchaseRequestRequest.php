@@ -7,9 +7,7 @@ use App\Services\BranchAccessService;
 use App\Services\DepartmentAccessService;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
-use Illuminate\Validation\Validator;
 
 class PurchaseRequestRequest extends FormRequest
 {
@@ -64,7 +62,7 @@ class PurchaseRequestRequest extends FormRequest
             'asset_maintenance_record_id' => [
                 'nullable',
                 'ulid',
-                Rule::exists('asset_maintenance_records', 'id')->where(
+                Rule::exists('trx_asset_maintenance_records', 'id')->where(
                     fn (Builder $query) => $query->where('status', AssetMaintenanceRecord::STATUS_WAITING_PARTS),
                 ),
             ],
@@ -86,7 +84,7 @@ class PurchaseRequestRequest extends FormRequest
                 'string',
                 'size:26',
                 'exists:mst_products,id',
-                Rule::exists('product_department', 'product_id')->where('department_id', $this->input('department_id')),
+                Rule::exists('mst_product_departments', 'product_id')->where('department_id', $this->input('department_id')),
             ],
 
             'items.*.service_type_id' => [
@@ -122,7 +120,7 @@ class PurchaseRequestRequest extends FormRequest
                 'required',
                 'string',
                 'size:26',
-                'exists:mst_units_of_measure,id',
+                'exists:mst_prc_uom,id',
             ],
 
             'items.*.estimated_unit_price' => [
@@ -135,7 +133,7 @@ class PurchaseRequestRequest extends FormRequest
                 'nullable',
                 'string',
                 'size:26',
-                'exists:mst_vendors,id',
+                'exists:mst_prc_vendors,id',
             ],
 
             'items.*.vendor_pic' => [
@@ -164,6 +162,17 @@ class PurchaseRequestRequest extends FormRequest
                 'boolean',
             ],
 
+            'items.*.tax_id' => [
+                'nullable',
+                'string',
+                'size:26',
+                Rule::exists('mst_prc_taxes', 'id')->where(
+                    fn (Builder $query) => $query
+                        ->where('is_active', true)
+                        ->whereNull('deleted_at'),
+                ),
+            ],
+
             'items.*.required_date' => [
                 'nullable',
                 'date',
@@ -189,35 +198,6 @@ class PurchaseRequestRequest extends FormRequest
         ];
     }
 
-    public function withValidator(Validator $validator): void
-    {
-        $validator->after(function (Validator $validator): void {
-            $items = $this->input('items', []);
-            if (! is_array($items)) {
-                return;
-            }
-
-            foreach ($items as $index => $item) {
-                if (! is_array($item)) {
-                    continue;
-                }
-
-                if (($item['item_type'] ?? null) !== 'PRODUCT' || blank($item['product_id'] ?? null) || blank($item['delivery_branch_id'] ?? null)) {
-                    continue;
-                }
-
-                $isAssignedToBranch = DB::table('product_branch')
-                    ->where('product_id', $item['product_id'])
-                    ->where('branch_id', $item['delivery_branch_id'])
-                    ->exists();
-
-                if (! $isAssignedToBranch) {
-                    $validator->errors()->add("items.{$index}.product_id", 'Produk tidak tersedia pada branch pengiriman yang dipilih.');
-                }
-            }
-        });
-    }
-
     public function attributes(): array
     {
         return [
@@ -234,6 +214,7 @@ class PurchaseRequestRequest extends FormRequest
             'items.*.uom_id' => 'satuan',
             'items.*.estimated_unit_price' => 'estimasi harga satuan',
             'items.*.vendor_id' => 'vendor',
+            'items.*.tax_id' => 'tax',
             'items.*.required_date' => 'tanggal kebutuhan',
         ];
     }

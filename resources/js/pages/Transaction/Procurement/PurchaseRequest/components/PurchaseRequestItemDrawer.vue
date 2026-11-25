@@ -25,7 +25,8 @@ interface Option {
     group?: string;
 
     requires_asset?: boolean;
-    branch_ids?: string[];
+    rate?: number;
+    category?: "ADDITIVE" | "WITHHOLDING";
 }
 
 interface PurchaseRequestItem {
@@ -56,6 +57,7 @@ interface PurchaseRequestItem {
     requires_po: boolean;
 
     tax_included: boolean;
+    tax_id: string | null;
 
     required_date: Date | null;
 
@@ -79,6 +81,8 @@ const props = defineProps<{
 
     vendorOptions: Option[];
 
+    taxOptions: Option[];
+
     branchOptions: Option[];
 }>();
 
@@ -91,9 +95,7 @@ const emit = defineEmits<{
 }>();
 
 const localItem = ref<PurchaseRequestItem | null>(null);
-const availableProductOptions = computed(() => props.productOptions.filter((option) =>
-    !localItem.value?.delivery_branch_id || option.branch_ids?.includes(localItem.value.delivery_branch_id),
-));
+const availableProductOptions = computed(() => props.productOptions);
 
 const drawerVisible = computed({
     get: () => props.visible,
@@ -131,17 +133,6 @@ watch(
     },
 );
 
-watch(() => localItem.value?.delivery_branch_id, (branchId) => {
-    if (!branchId || !localItem.value?.product_id) {
-        return;
-    }
-
-    const product = props.productOptions.find((option) => option.value === localItem.value?.product_id);
-    if (!product?.branch_ids?.includes(branchId)) {
-        localItem.value.product_id = null;
-    }
-});
-
 const isService = computed(() => localItem.value?.item_type === "SERVICE");
 
 const selectedService = computed(() =>
@@ -149,6 +140,8 @@ const selectedService = computed(() =>
         (option) => option.value === localItem.value?.service_type_id,
     ),
 );
+
+const selectedTax = computed(() => props.taxOptions.find((option) => option.value === localItem.value?.tax_id));
 
 const requiresAsset = computed(
     () => isService.value && selectedService.value?.requires_asset === true,
@@ -189,6 +182,12 @@ const onServiceChange = () => {
 
     if (!requiresAsset.value) {
         localItem.value.asset_id = null;
+    }
+};
+
+const onTaxChange = () => {
+    if (selectedTax.value?.category === "WITHHOLDING" && localItem.value) {
+        localItem.value.tax_included = false;
     }
 };
 
@@ -592,6 +591,12 @@ const formatCurrency = (value: number) =>
                             />
                         </div>
 
+                        <div>
+                            <label class="mb-1.5 block text-xs font-medium text-gray-700 dark:text-gray-300">Jenis Pajak</label>
+                            <Select v-model="localItem.tax_id" :options="taxOptions" option-label="label" option-value="value" show-clear placeholder="Tanpa pajak" fluid @change="onTaxChange" />
+                            <p v-if="selectedTax" class="mt-1 text-xs text-gray-500">Tarif {{ selectedTax.rate }}% · {{ selectedTax.category === 'WITHHOLDING' ? 'dipotong dari pembayaran' : 'menambah nilai pengadaan' }}</p>
+                        </div>
+
                         <!-- PROCUREMENT OPTIONS -->
                         <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
                             <label
@@ -610,6 +615,7 @@ const formatCurrency = (value: number) =>
                             </label>
 
                             <label
+                                v-if="selectedTax?.category === 'ADDITIVE'"
                                 class="flex cursor-pointer items-center gap-3 rounded-lg border border-gray-200 px-3 py-3 transition hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-white/[0.03]"
                             >
                                 <input
@@ -620,7 +626,7 @@ const formatCurrency = (value: number) =>
                                 <span
                                     class="text-xs font-medium text-gray-700 dark:text-gray-300"
                                 >
-                                    Harga sudah termasuk PPN
+                                    Harga sudah termasuk {{ selectedTax?.name ?? 'pajak' }}
                                 </span>
                             </label>
                         </div>

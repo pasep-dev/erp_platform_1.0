@@ -2,10 +2,10 @@
 
 namespace App\Services\AssetManagement;
 
+use App\Enums\NumberingModuleCode;
 use App\Models\Master\Organization\Department;
 use App\Models\Master\Organization\Location;
 use App\Models\Master\Product\Product;
-use App\Models\NumberingDocument;
 use App\Models\Transaction\AssetManagement\Asset;
 use App\Models\Transaction\Procurement\GoodsReceipt;
 use App\Models\Transaction\Procurement\GoodsReceiptItem;
@@ -168,9 +168,6 @@ class AssetRegistrationService
             $receipt = $receiptItem->goodsReceipt;
             $this->departmentAccess->authorize($actor, $receipt->department_id);
             $location = $this->validatedLocation($data['location_id'], (string) $receipt->company_id);
-            if (! $sourceItem->product->branches()->whereKey($location->branch_id)->exists()) {
-                throw ValidationException::withMessages(['product_id' => 'Produk tidak tersedia pada branch lokasi aset.']);
-            }
             $this->assertCustodianDepartment($data['custodian_id'] ?? null, (string) $receipt->department_id, (string) $location->branch_id);
 
             $assets = [];
@@ -180,6 +177,7 @@ class AssetRegistrationService
                     product: $sourceItem->product,
                     companyId: (string) $receipt->company_id,
                     departmentId: (string) $receipt->department_id,
+                    departmentCode: $receipt->department->code,
                     location: $location,
                     custodianId: $data['custodian_id'] ?? null,
                     acquisitionDate: $receipt->received_at->toDateString(),
@@ -210,12 +208,12 @@ class AssetRegistrationService
                 ->where('group', 'ASSET')
                 ->findOrFail($data['product_id']);
             $location = $this->validatedLocation($data['location_id'], $data['company_id']);
-            $departmentBelongsToCompany = Department::query()
+            $department = Department::query()
                 ->whereKey($data['department_id'])
                 ->where('company_id', $data['company_id'])
-                ->exists();
+                ->first();
 
-            if (! $departmentBelongsToCompany) {
+            if ($department === null) {
                 throw ValidationException::withMessages([
                     'company_id' => 'Perusahaan aset tidak sesuai dengan data yang dipilih.',
                 ]);
@@ -224,9 +222,6 @@ class AssetRegistrationService
             $this->departmentAccess->authorize($actor, $data['department_id']);
             if (! $product->departments()->whereKey($data['department_id'])->exists()) {
                 throw ValidationException::withMessages(['product_id' => 'Produk belum ditautkan ke department aset.']);
-            }
-            if (! $product->branches()->whereKey($location->branch_id)->exists()) {
-                throw ValidationException::withMessages(['product_id' => 'Produk tidak tersedia pada branch lokasi aset.']);
             }
             $this->assertCustodianDepartment($data['custodian_id'] ?? null, $data['department_id'], (string) $location->branch_id);
 
@@ -237,6 +232,7 @@ class AssetRegistrationService
                     product: $product,
                     companyId: $data['company_id'],
                     departmentId: $data['department_id'],
+                    departmentCode: $department->code,
                     location: $location,
                     custodianId: $data['custodian_id'] ?? null,
                     acquisitionDate: $data['acquisition_date'],
@@ -260,6 +256,7 @@ class AssetRegistrationService
         Product $product,
         string $companyId,
         string $departmentId,
+        string $departmentCode,
         Location $location,
         ?int $custodianId,
         string $acquisitionDate,
@@ -293,11 +290,19 @@ class AssetRegistrationService
             ]);
         }
 
-        $number = $this->numberingService->generate(NumberingDocument::CODE_ASSET, [
-            'company' => $location->company->code,
-            'asset_type' => $product->type->code,
-            'branch' => $location->branch?->code ?? $location->code,
-        ]);
+        $number = $this->numberingService->generate(
+            NumberingModuleCode::Asset,
+            [
+                'company' => $location->company->code,
+                'department' => $departmentCode,
+                'asset_type' => $product->type->code,
+                'category' => $product->category->code,
+                'product' => $product->code,
+                'branch' => $location->branch?->code ?? $location->code,
+                'location' => $location->code,
+                'document_type' => $registrationMethod,
+            ],
+        );
 
         $warrantyStartDate = $warrantyDurationMonths === null
             ? null

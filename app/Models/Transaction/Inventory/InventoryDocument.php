@@ -35,7 +35,7 @@ class InventoryDocument extends Model
 
     public const STATUS_REJECTED = 'REJECTED';
 
-    protected $table = 'inventory_documents';
+    protected $table = 'trx_inventory_documents';
 
     protected $fillable = [
         'number',

@@ -81,8 +81,8 @@ class AssetRegistrationWorkflowTest extends TestCase
             ])
             ->assertSessionHasErrors('units');
 
-        $this->assertDatabaseCount('assets', 2);
-        $this->assertDatabaseHas('assets', [
+        $this->assertDatabaseCount('trx_assets', 2);
+        $this->assertDatabaseHas('trx_assets', [
             'goods_receipt_item_id' => $receiptItem->id,
             'source_unit_number' => 2,
             'number' => 'TST-LTP002BR',
@@ -114,7 +114,7 @@ class AssetRegistrationWorkflowTest extends TestCase
             ])
             ->assertSessionHasNoErrors();
 
-        $this->assertDatabaseHas('assets', [
+        $this->assertDatabaseHas('trx_assets', [
             'number' => 'TST-LTP001BR',
             'registration_method' => Asset::METHOD_EXISTING,
             'goods_receipt_item_id' => null,
@@ -212,7 +212,7 @@ class AssetRegistrationWorkflowTest extends TestCase
             ])
             ->assertSessionHasNoErrors();
 
-        $this->assertDatabaseHas('assets', [
+        $this->assertDatabaseHas('trx_assets', [
             'goods_receipt_item_id' => $receiptItem->id,
             'acquisition_cost' => 21000,
         ]);
@@ -289,7 +289,7 @@ class AssetRegistrationWorkflowTest extends TestCase
             ])
             ->assertSessionHasErrors('units.0.specifications.0.value');
 
-        $this->assertDatabaseCount('assets', 0);
+        $this->assertDatabaseCount('trx_assets', 0);
     }
 
     public function test_user_without_registration_permission_cannot_create_an_asset(): void
@@ -300,7 +300,7 @@ class AssetRegistrationWorkflowTest extends TestCase
             ->post(route('transaction.asset-management.registrations.store'), [])
             ->assertForbidden();
 
-        $this->assertDatabaseCount('assets', 0);
+        $this->assertDatabaseCount('trx_assets', 0);
     }
 
     public function test_existing_asset_cannot_be_assigned_to_a_location_from_another_company(): void
@@ -337,7 +337,7 @@ class AssetRegistrationWorkflowTest extends TestCase
             ])
             ->assertSessionHasErrors('location_id');
 
-        $this->assertDatabaseCount('assets', 0);
+        $this->assertDatabaseCount('trx_assets', 0);
     }
 
     public function test_goods_receipt_draft_cannot_create_an_asset(): void
@@ -356,7 +356,7 @@ class AssetRegistrationWorkflowTest extends TestCase
             ])
             ->assertSessionHasErrors('goods_receipt_item_id');
 
-        $this->assertDatabaseCount('assets', 0);
+        $this->assertDatabaseCount('trx_assets', 0);
     }
 
     public function test_procurement_registration_requires_a_location_and_keeps_the_asset_unregistered(): void
@@ -373,7 +373,7 @@ class AssetRegistrationWorkflowTest extends TestCase
             ])
             ->assertSessionHasErrors('location_id');
 
-        $this->assertDatabaseCount('assets', 0);
+        $this->assertDatabaseCount('trx_assets', 0);
     }
 
     public function test_goods_receipt_rejects_fractional_accepted_quantity_for_asset_products(): void
@@ -425,7 +425,7 @@ class AssetRegistrationWorkflowTest extends TestCase
             ])
             ->assertSessionHasErrors('items.0.quantity_accepted');
 
-        $this->assertDatabaseCount('goods_receipts', 0);
+        $this->assertDatabaseCount('trx_goods_receipts', 0);
     }
 
     /** @return array{User, Company, Department, Product, Location} */

@@ -105,7 +105,7 @@ class AssetDisposalWorkflowTest extends TestCase
             ->assertSessionHasErrors('asset_id');
 
         $this->assertSame(Asset::STATUS_ACTIVE, $asset->fresh()->status);
-        $this->assertDatabaseCount('asset_disposals', 0);
+        $this->assertDatabaseCount('trx_asset_disposals', 0);
     }
 
     public function test_disposal_pages_require_view_and_disposal_permissions(): void

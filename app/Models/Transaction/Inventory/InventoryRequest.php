@@ -15,6 +15,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class InventoryRequest extends Model
 {
+    protected $table = 'trx_inventory_requests';
+
     use HasBranchAccessScope;
     use HasDepartmentAccessScope;
     use HasUlids;

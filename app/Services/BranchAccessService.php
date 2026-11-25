@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Master\Organization\Branch;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\DB;
 
 class BranchAccessService
 {
@@ -21,7 +22,9 @@ class BranchAccessService
         }
 
         return collect([$user->branch_id])
-            ->merge($user->additionalBranches()->pluck('mst_org_branches.id'))
+            ->merge(DB::table('user_branch_access')
+                ->where('user_id', $user->getKey())
+                ->pluck('branch_id'))
             ->filter()
             ->unique()
             ->values()

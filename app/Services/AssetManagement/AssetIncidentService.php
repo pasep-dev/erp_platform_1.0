@@ -2,15 +2,18 @@
 
 namespace App\Services\AssetManagement;
 
+use App\Enums\NumberingModuleCode;
 use App\Models\Transaction\AssetManagement\Asset;
 use App\Models\Transaction\AssetManagement\AssetIncident;
 use App\Models\User;
+use App\Services\NumberingService;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 class AssetIncidentService
 {
+    public function __construct(private readonly NumberingService $numberingService) {}
+
     /**
      * @param  array<string, mixed>  $data
      */
@@ -18,6 +21,7 @@ class AssetIncidentService
     {
         return DB::transaction(function () use ($data, $actor, $evidencePath): AssetIncident {
             $asset = Asset::query()->whereKey($data['asset_id'])->lockForUpdate()->firstOrFail();
+            $asset->load(['company:id,code', 'department:id,code', 'branch:id,code', 'location:id,code', 'type:id,code', 'category:id,code', 'product:id,code']);
 
             if (! in_array($asset->status, [Asset::STATUS_ACTIVE, Asset::STATUS_MISSING], true)) {
                 throw ValidationException::withMessages([
@@ -27,7 +31,20 @@ class AssetIncidentService
 
             $incident = AssetIncident::query()->create([
                 ...$data,
-                'number' => 'INC-'.now()->format('Ymd').'-'.Str::upper(Str::substr((string) Str::ulid(), -8)),
+                'number' => $this->numberingService->generate(
+                    NumberingModuleCode::AssetIncident,
+                    [
+                        'company' => $asset->company?->code,
+                        'department' => $asset->department?->code,
+                        'branch' => $asset->branch?->code,
+                        'location' => $asset->location?->code,
+                        'asset_type' => $asset->type?->code,
+                        'category' => $asset->category?->code,
+                        'product' => $asset->product?->code,
+                        'document_type' => 'ASSET_INCIDENT',
+                        'event_type' => $data['incident_type'],
+                    ],
+                ),
                 'status' => AssetIncident::STATUS_REPORTED,
                 'condition_before' => $asset->condition,
                 'asset_status_before' => $asset->status,

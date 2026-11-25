@@ -26,7 +26,7 @@ class GoodsReceiptItem extends Model
     use HasDepartmentAccessScope;
     use HasUlids;
 
-    protected $table = 'goods_receipt_items';
+    protected $table = 'trx_goods_receipt_items';
 
     protected $fillable = [
         'goods_receipt_id',

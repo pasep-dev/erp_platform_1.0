@@ -36,7 +36,7 @@ class PurchaseRequest extends Model
     use HasFactory;
     use HasUlids;
 
-    protected $table = 'purchase_requests';
+    protected $table = 'trx_purchase_requests';
 
     protected $fillable = [
         'number',

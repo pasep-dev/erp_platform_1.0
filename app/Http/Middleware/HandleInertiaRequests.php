@@ -97,7 +97,7 @@ class HandleInertiaRequests extends Middleware
 
             'auth' => [
                 'user' => $request->user(),
-                'is_administrator' => $request->user()?->hasGlobalDepartmentAccess() ?? false,
+                'is_administrator' => $request->user()?->isAdministrator() ?? false,
                 'menu_visibility' => fn () => $request->user() === null
                     ? null
                     : app(MenuVisibilityService::class)->visibleMenuKeysFor($request->user()),

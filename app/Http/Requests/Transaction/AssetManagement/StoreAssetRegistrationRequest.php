@@ -21,14 +21,14 @@ class StoreAssetRegistrationRequest extends FormRequest
         $isProcurementRegistration = $this->filled('goods_receipt_item_id');
 
         return [
-            'goods_receipt_item_id' => ['nullable', 'string', 'exists:goods_receipt_items,id'],
-            'product_id' => [$isProcurementRegistration ? 'prohibited' : 'required', 'string', Rule::exists('mst_products', 'id')->where('group', 'ASSET')->where('is_active', true)->whereNull('deleted_at'), Rule::exists('product_department', 'product_id')->where('department_id', $this->input('department_id'))],
+            'goods_receipt_item_id' => ['nullable', 'string', 'exists:trx_goods_receipt_items,id'],
+            'product_id' => [$isProcurementRegistration ? 'prohibited' : 'required', 'string', Rule::exists('mst_products', 'id')->where('group', 'ASSET')->where('is_active', true)->whereNull('deleted_at'), Rule::exists('mst_product_departments', 'product_id')->where('department_id', $this->input('department_id'))],
             'company_id' => [$isProcurementRegistration ? 'prohibited' : 'required', 'string', Rule::exists('mst_org_companies', 'id')->where('is_active', true)->whereNull('deleted_at')],
             'department_id' => [$isProcurementRegistration ? 'prohibited' : 'required', 'string', Rule::exists('mst_org_departments', 'id')->where('company_id', $this->input('company_id'))->where('is_active', true)->whereNull('deleted_at'), Rule::in(app(DepartmentAccessService::class)->departmentIds($this->user()))],
             'location_id' => ['required', 'string', 'exists:mst_org_locations,id'],
             'custodian_id' => ['nullable', 'integer', Rule::exists('users', 'id')->where('is_active', true)],
             'units' => ['required', 'array', 'min:1', 'max:500'],
-            'units.*.serial_number' => ['nullable', 'string', 'max:150', 'distinct:ignore_case', Rule::unique('assets', 'serial_number')],
+            'units.*.serial_number' => ['nullable', 'string', 'max:150', 'distinct:ignore_case', Rule::unique('trx_assets', 'serial_number')],
             'units.*.specifications' => ['nullable', 'array', 'max:50'],
             'units.*.specifications.*.name' => ['nullable', 'string', 'max:100'],
             'units.*.specifications.*.value' => ['nullable', 'string', 'max:500'],

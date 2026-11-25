@@ -20,6 +20,7 @@ interface Snapshot {
 }
 interface AssignmentHistory {
     id: string
+    number: string
     event_type: 'ASSIGNED' | 'TRANSFERRED' | 'RETURNED' | string
     from_snapshot: Snapshot | null
     to_snapshot: Snapshot | null
@@ -108,8 +109,18 @@ const statusSeverity = computed(() => {
     return props.asset.custodian ? 'info' : 'success'
 })
 
-function date(value: string): string {
-    return new Intl.DateTimeFormat('id-ID', { dateStyle: 'medium' }).format(new Date(`${value}T00:00:00`))
+function date(value: string | null | undefined): string {
+    if (!value) {
+        return '-'
+    }
+
+    const parsedDate = new Date(`${value.slice(0, 10)}T00:00:00`)
+
+    if (Number.isNaN(parsedDate.getTime())) {
+        return '-'
+    }
+
+    return new Intl.DateTimeFormat('id-ID', { dateStyle: 'medium' }).format(parsedDate)
 }
 
 function eventLabel(event: AssignmentHistory): string {
@@ -195,7 +206,7 @@ function backToDirectory(): void {
                     <article v-for="(event, index) in asset.assignment_histories" :key="event.id" class="relative flex gap-3 pb-5 last:pb-0">
                         <div class="flex w-5 shrink-0 flex-col items-center"><span class="z-10 mt-1 h-3 w-3 rounded-full border-2 border-purple-600 bg-white dark:bg-gray-900" /><span v-if="index < asset.assignment_histories.length - 1" class="absolute top-4 bottom-0 w-px bg-gray-200 dark:bg-gray-700" /></div>
                         <div class="min-w-0 flex-1 rounded-lg bg-gray-50 p-3 dark:bg-gray-800/70">
-                            <div class="flex flex-wrap items-start justify-between gap-2"><h3 class="text-sm font-semibold text-gray-900 dark:text-white">{{ eventLabel(event) }}</h3><div class="flex items-center gap-2"><time class="text-xs text-gray-500">{{ date(event.effective_at) }}</time><Button icon="pi pi-print" severity="secondary" text rounded aria-label="Cetak bukti serah terima" v-tooltip.top="'Cetak bukti serah terima / return'" @click="printHistory(event)" /></div></div>
+                            <div class="flex flex-wrap items-start justify-between gap-2"><div><h3 class="text-sm font-semibold text-gray-900 dark:text-white">{{ eventLabel(event) }}</h3><p class="mt-1 font-mono text-xs text-purple-700 dark:text-purple-300">{{ event.number }}</p></div><div class="flex items-center gap-2"><time class="text-xs text-gray-500">{{ date(event.effective_at) }}</time><Button icon="pi pi-print" severity="secondary" text rounded aria-label="Cetak bukti serah terima" v-tooltip.top="'Cetak bukti serah terima / return'" @click="printHistory(event)" /></div></div>
                             <p class="mt-2 text-xs leading-5 text-gray-600 dark:text-gray-300"><span class="font-medium">{{ event.from_snapshot?.custodian_name ?? 'Available' }}</span><i class="pi pi-arrow-right mx-2 text-[10px] text-gray-400" /><span class="font-medium">{{ event.to_snapshot?.custodian_name ?? 'Available' }}</span></p>
                             <p class="mt-1 text-xs text-gray-600 dark:text-gray-300">Kondisi: {{ conditionLabel(event.from_condition) }} <i class="pi pi-arrow-right mx-1 text-[10px] text-gray-400" /> {{ conditionLabel(event.to_condition) }}</p>
                             <p v-if="event.remarks" class="mt-2 whitespace-pre-line text-xs text-gray-600 dark:text-gray-300">{{ event.remarks }}</p>

@@ -4,6 +4,22 @@ namespace App\Http\Requests\Master;
 
 trait AuthorizesMasterData
 {
+    protected function prepareForValidation(): void
+    {
+        $this->normalizeMasterDataCode();
+    }
+
+    protected function normalizeMasterDataCode(): void
+    {
+        $code = $this->input('code');
+
+        if (is_string($code)) {
+            $this->merge([
+                'code' => mb_strtoupper($code, 'UTF-8'),
+            ]);
+        }
+    }
+
     public function authorize(): bool
     {
         $user = $this->user();

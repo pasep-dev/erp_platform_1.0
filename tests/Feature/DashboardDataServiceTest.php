@@ -16,15 +16,15 @@ class DashboardDataServiceTest extends TestCase
         'approval_request_levels',
         'approval_requests',
         'approval_workflows',
-        'asset_maintenance_records',
-        'asset_incidents',
-        'assets',
+        'trx_asset_maintenance_records',
+        'trx_asset_incidents',
+        'trx_assets',
         'activity_logs',
-        'purchase_orders',
-        'goods_receipts',
-        'inventory_stock_movements',
-        'inventory_stock_thresholds',
-        'inventory_department_warehouses',
+        'trx_purchase_orders',
+        'trx_goods_receipts',
+        'trx_inventory_stock_movements',
+        'trx_inventory_stock_thresholds',
+        'trx_inventory_department_warehouses',
         'mst_products',
         'mst_org_departments',
         'model_has_roles',
@@ -66,13 +66,13 @@ class DashboardDataServiceTest extends TestCase
             'model_id' => 1,
         ]);
 
-        DB::table('assets')->insert([
+        DB::table('trx_assets')->insert([
             ['id' => 'asset-assigned', 'status' => 'ACTIVE', 'custodian_id' => 1],
             ['id' => 'asset-available', 'status' => 'ACTIVE', 'custodian_id' => null],
             ['id' => 'asset-maintenance', 'status' => 'ACTIVE', 'custodian_id' => null],
             ['id' => 'asset-disposed', 'status' => 'DISPOSED', 'custodian_id' => null],
         ]);
-        DB::table('asset_maintenance_records')->insert([
+        DB::table('trx_asset_maintenance_records')->insert([
             [
                 'id' => 'maintenance-1',
                 'asset_id' => 'asset-maintenance',
@@ -80,16 +80,16 @@ class DashboardDataServiceTest extends TestCase
                 'scheduled_at' => today()->addDays(3)->toDateString(),
             ],
         ]);
-        DB::table('asset_incidents')->insert([
+        DB::table('trx_asset_incidents')->insert([
             ['id' => 'incident-open', 'status' => 'REPORTED'],
             ['id' => 'incident-closed', 'status' => 'RESOLVED'],
         ]);
-        DB::table('purchase_orders')->insert([
+        DB::table('trx_purchase_orders')->insert([
             ['id' => 'po-submitted', 'status' => 'SUBMITTED'],
             ['id' => 'po-partial', 'status' => 'PARTIALLY_RECEIVED'],
             ['id' => 'po-draft', 'status' => 'DRAFT'],
         ]);
-        DB::table('goods_receipts')->insert([
+        DB::table('trx_goods_receipts')->insert([
             ['id' => 'receipt-draft', 'status' => 'DRAFT'],
             ['id' => 'receipt-posted', 'status' => 'POSTED'],
         ]);
@@ -136,12 +136,12 @@ class DashboardDataServiceTest extends TestCase
             ['id' => 'product-low', 'group' => 'CONSUMABLE', 'is_active' => true],
             ['id' => 'product-partial', 'group' => 'CONSUMABLE', 'is_active' => true],
         ]);
-        DB::table('inventory_department_warehouses')->insert([
+        DB::table('trx_inventory_department_warehouses')->insert([
             'id' => 'warehouse-1',
             'department_id' => 'department-1',
             'location_id' => 'location-1',
         ]);
-        DB::table('inventory_stock_thresholds')->insert([
+        DB::table('trx_inventory_stock_thresholds')->insert([
             [
                 'id' => 'threshold-low',
                 'department_id' => 'department-1',
@@ -157,7 +157,7 @@ class DashboardDataServiceTest extends TestCase
                 'minimum_quantity' => 3,
             ],
         ]);
-        DB::table('inventory_stock_movements')->insert([
+        DB::table('trx_inventory_stock_movements')->insert([
             [
                 'id' => 'movement-partial',
                 'department_id' => 'department-1',
@@ -267,26 +267,26 @@ class DashboardDataServiceTest extends TestCase
             $table->boolean('is_active');
             $table->timestamp('deleted_at')->nullable();
         });
-        Schema::create('assets', function (Blueprint $table): void {
+        Schema::create('trx_assets', function (Blueprint $table): void {
             $table->string('id')->primary();
             $table->string('status');
             $table->unsignedBigInteger('custodian_id')->nullable();
         });
-        Schema::create('asset_maintenance_records', function (Blueprint $table): void {
+        Schema::create('trx_asset_maintenance_records', function (Blueprint $table): void {
             $table->string('id')->primary();
             $table->string('asset_id');
             $table->string('status');
             $table->date('scheduled_at')->nullable();
         });
-        Schema::create('asset_incidents', function (Blueprint $table): void {
+        Schema::create('trx_asset_incidents', function (Blueprint $table): void {
             $table->string('id')->primary();
             $table->string('status');
         });
-        Schema::create('purchase_orders', function (Blueprint $table): void {
+        Schema::create('trx_purchase_orders', function (Blueprint $table): void {
             $table->string('id')->primary();
             $table->string('status');
         });
-        Schema::create('goods_receipts', function (Blueprint $table): void {
+        Schema::create('trx_goods_receipts', function (Blueprint $table): void {
             $table->string('id')->primary();
             $table->string('status');
         });
@@ -321,19 +321,19 @@ class DashboardDataServiceTest extends TestCase
             $table->string('description')->nullable();
             $table->timestamp('created_at');
         });
-        Schema::create('inventory_department_warehouses', function (Blueprint $table): void {
+        Schema::create('trx_inventory_department_warehouses', function (Blueprint $table): void {
             $table->string('id')->primary();
             $table->string('department_id');
             $table->string('location_id');
         });
-        Schema::create('inventory_stock_thresholds', function (Blueprint $table): void {
+        Schema::create('trx_inventory_stock_thresholds', function (Blueprint $table): void {
             $table->string('id')->primary();
             $table->string('department_id');
             $table->string('location_id');
             $table->string('product_id');
             $table->decimal('minimum_quantity', 15, 3);
         });
-        Schema::create('inventory_stock_movements', function (Blueprint $table): void {
+        Schema::create('trx_inventory_stock_movements', function (Blueprint $table): void {
             $table->string('id')->primary();
             $table->string('department_id');
             $table->string('location_id');

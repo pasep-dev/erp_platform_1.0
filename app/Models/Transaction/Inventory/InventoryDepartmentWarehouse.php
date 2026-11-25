@@ -17,7 +17,7 @@ class InventoryDepartmentWarehouse extends Model
     use HasDepartmentAccessScope;
     use HasUlids;
 
-    protected $table = 'inventory_department_warehouses';
+    protected $table = 'trx_inventory_department_warehouses';
 
     protected $fillable = ['department_id', 'location_id', 'configured_by'];
 

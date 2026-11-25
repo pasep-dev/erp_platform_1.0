@@ -62,6 +62,11 @@ class User extends Authenticatable
         return $this->hasRole(['Administrator', 'Owner']);
     }
 
+    public function isAdministrator(): bool
+    {
+        return $this->hasRole('Administrator');
+    }
+
     public function hasGlobalBranchAccess(): bool
     {
         return $this->hasRole(['Administrator', 'Owner']);

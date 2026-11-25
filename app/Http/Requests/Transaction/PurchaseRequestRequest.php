@@ -173,7 +173,7 @@ class PurchaseRequestRequest extends FormRequest
                 'required',
                 'string',
                 'size:26',
-                Rule::exists('mst_units_of_measure', 'id')
+                Rule::exists('mst_prc_uom', 'id')
                     ->where('is_active', true),
             ],
 
@@ -187,7 +187,7 @@ class PurchaseRequestRequest extends FormRequest
                 'nullable',
                 'string',
                 'size:26',
-                Rule::exists('mst_vendors', 'id')
+                Rule::exists('mst_prc_vendors', 'id')
                     ->where('is_active', true),
             ],
 

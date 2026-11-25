@@ -89,6 +89,9 @@ const approvalForm = useForm<{ signed_document: File | null; remarks: string }>(
 const rejectForm = useForm({ rejection_reason: '' })
 const cancelForm = useForm({ cancellation_reason: '' })
 const hasApprovalDecision = computed(() => props.maintenance.approved_at !== null || props.maintenance.rejected_at !== null)
+const latestCompletedService = computed(() => props.maintenance.asset.maintenance_records
+    .filter((record) => record.id !== props.maintenance.id && record.status === 'COMPLETED' && record.completed_at)
+    .sort((left, right) => (right.completed_at ?? '').localeCompare(left.completed_at ?? ''))[0] ?? null)
 
 function statusSeverity(value: string): string {
     return ({ REQUESTED: 'warn', WAITING_APPROVAL: 'info', WAITING_PARTS: 'info', READY_TO_START: 'info', IN_PROGRESS: 'info', COMPLETED: 'success', CANCELLED: props.maintenance.rejected_at ? 'danger' : 'secondary' } as Record<string, string>)[value] ?? 'secondary'
@@ -229,6 +232,16 @@ function cancelRequest(): void {
                     <p class="mt-1 text-sm font-medium">{{ maintenance.asset.product.name }}</p>
                     <p class="text-xs text-gray-500">{{ maintenance.asset.product.code }} · SN {{ maintenance.asset.serial_number || '-' }}</p>
                     <dl class="mt-4 space-y-3 border-t border-gray-100 pt-4 text-sm dark:border-gray-800"><div><dt class="text-xs text-gray-500">Perusahaan</dt><dd class="mt-1">{{ maintenance.asset.company.name }}</dd></div><div><dt class="text-xs text-gray-500">Departemen / lokasi</dt><dd class="mt-1">{{ maintenance.asset.department.name }} · {{ maintenance.asset.location.name }}</dd></div><div><dt class="text-xs text-gray-500">Penanggung jawab</dt><dd class="mt-1">{{ maintenance.asset.custodian?.name ?? 'Available' }}</dd></div></dl>
+                </section>
+
+                <section class="mt-4 rounded-xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-900">
+                    <h2 class="font-semibold text-gray-900 dark:text-white">Maintenance / Service Terakhir</h2>
+                    <template v-if="latestCompletedService">
+                        <Link :href="route('transaction.asset-management.maintenance.show', latestCompletedService.id)" class="mt-3 inline-flex font-mono text-sm font-semibold text-purple-700 hover:underline dark:text-purple-300">{{ latestCompletedService.number }}</Link>
+                        <p class="mt-1 text-xs text-gray-500">{{ date(latestCompletedService.completed_at) }} · {{ latestCompletedService.maintenance_type === 'PREVENTIVE' ? 'Preventive' : 'Corrective' }}</p>
+                        <p class="mt-2 whitespace-pre-line text-sm text-gray-700 dark:text-gray-300">{{ latestCompletedService.work_summary || '-' }}</p>
+                    </template>
+                    <p v-else class="mt-3 text-sm text-gray-500">-</p>
                 </section>
             </aside>
         </section>

@@ -15,7 +15,7 @@ class InventoryStocktakeItem extends Model
     use HasDepartmentAccessScope;
     use HasUlids;
 
-    protected $table = 'inventory_stocktake_items';
+    protected $table = 'trx_inventory_stocktake_items';
 
     protected $fillable = [
         'inventory_stocktake_id', 'product_id', 'snapshot_quantity', 'snapshot_serial_numbers',

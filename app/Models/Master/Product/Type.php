@@ -13,7 +13,7 @@ class Type extends Model
     use HasUlids;
     use SoftDeletes;
 
-    protected $table = 'mst_asset_types';
+    protected $table = 'mst_product_types';
 
     protected $fillable = [
         'category_id',

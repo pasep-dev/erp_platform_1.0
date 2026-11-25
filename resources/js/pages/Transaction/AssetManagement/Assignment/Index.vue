@@ -18,10 +18,10 @@ interface Asset {
     number: string
     serial_number: string | null
     status: string
-    product: { code: string; name: string }
-    company: { code: string; name: string }
-    department: { code: string; name: string }
-    location: { code: string; name: string }
+    product: { code: string; name: string } | null
+    company: { code: string; name: string } | null
+    department: { code: string; name: string } | null
+    location: { code: string; name: string } | null
     custodian: { name: string; email: string } | null
 }
 
@@ -48,7 +48,7 @@ const rows = computed(() => props.assets.data.map((asset) => ({
     asset,
     number: asset.number,
     product: asset.product,
-    placement: `${asset.company.name} · ${asset.department.name} · ${asset.location.name}`,
+    placement: [asset.company?.name, asset.department?.name, asset.location?.name].filter(Boolean).join(' · ') || 'Penempatan tidak tersedia',
     custodian: asset.custodian,
     assignment_status: asset.custodian ? 'Assigned' : 'Available',
 })))
@@ -77,7 +77,7 @@ function changePerPage(): void {
 
             <CrudTable :columns="columns" :rows="rows" row-key="id" empty-message="Belum ada aset di Asset Directory.">
                 <template #cell-number="{ row }"><span class="font-semibold text-gray-900 dark:text-white">{{ row.number }}</span><div v-if="row.asset.serial_number" class="text-xs text-gray-500">SN {{ row.asset.serial_number }}</div></template>
-                <template #cell-product="{ row }"><div class="font-medium text-gray-900 dark:text-white">{{ row.product.name }}</div><div class="text-xs text-gray-500">{{ row.product.code }}</div></template>
+                <template #cell-product="{ row }"><div class="font-medium text-gray-900 dark:text-white">{{ row.product?.name ?? 'Produk tidak tersedia' }}</div><div v-if="row.product?.code" class="text-xs text-gray-500">{{ row.product.code }}</div></template>
                 <template #cell-placement="{ row }"><span class="text-xs">{{ row.placement }}</span></template>
                 <template #cell-custodian="{ row }"><div v-if="row.custodian" class="font-medium">{{ row.custodian.name }}</div><span v-else class="text-sm text-gray-500">Belum ditugaskan</span><div v-if="row.custodian" class="text-xs text-gray-500">{{ row.custodian.email }}</div></template>
                 <template #cell-assignment_status="{ row }"><Tag :value="row.assignment_status" :severity="row.assignment_status === 'Assigned' ? 'info' : 'success'" /></template>

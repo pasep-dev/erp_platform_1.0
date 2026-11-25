@@ -25,6 +25,16 @@ class MasterNumberingSeeder extends Seeder
                 'name' => 'Product Code',
                 'pattern' => 'PRD-{SEQ}',
             ],
+            [
+                'code' => NumberingDocument::CODE_PRODUCT_TYPE,
+                'name' => 'Product Type Code',
+                'pattern' => 'TYP-{SEQ}',
+            ],
+            [
+                'code' => NumberingDocument::CODE_PRODUCT_BRAND,
+                'name' => 'Product Brand Code',
+                'pattern' => 'BRD-{SEQ}',
+            ],
         ] as $document) {
             NumberingDocument::query()->firstOrCreate(
                 ['code' => $document['code']],

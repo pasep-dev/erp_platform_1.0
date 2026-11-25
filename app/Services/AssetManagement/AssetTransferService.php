@@ -2,6 +2,7 @@
 
 namespace App\Services\AssetManagement;
 
+use App\Enums\NumberingModuleCode;
 use App\Models\Master\Organization\Company;
 use App\Models\Master\Organization\Department;
 use App\Models\Master\Organization\Location;
@@ -11,8 +12,8 @@ use App\Models\Transaction\AssetManagement\AssetTransferHistory;
 use App\Models\User;
 use App\Services\BranchAccessService;
 use App\Services\DepartmentAccessService;
+use App\Services\NumberingService;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 class AssetTransferService
@@ -20,6 +21,7 @@ class AssetTransferService
     public function __construct(
         private readonly DepartmentAccessService $departmentAccess,
         private readonly BranchAccessService $branchAccess,
+        private readonly NumberingService $numberingService,
     ) {}
 
     /**
@@ -79,12 +81,6 @@ class AssetTransferService
                 ]);
             }
 
-            if (! $lockedAsset->product?->branches()->whereKey($location->branch_id)->exists()) {
-                throw ValidationException::withMessages([
-                    'location_id' => 'Produk aset tidak tersedia pada branch tujuan.',
-                ]);
-            }
-
             if ($lockedAsset->custodian_id !== null) {
                 $custodian = User::query()->whereKey($lockedAsset->custodian_id)->first();
                 if ($custodian !== null && ! $this->branchAccess->canAccess($custodian, $location->branch_id)) {
@@ -115,8 +111,32 @@ class AssetTransferService
                 }
             }
 
-            $lockedAsset->load(['company:id,code,name', 'department:id,code,name', 'location:id,code,name', 'branch:id,code,name', 'custodian:id,name,email']);
+            $lockedAsset->load(['company:id,code,name', 'department:id,code,name', 'location:id,code,name', 'branch:id,code,name', 'type:id,code', 'category:id,code', 'product:id,code', 'custodian:id,name,email']);
+            $location->loadMissing(['company:id,code,name', 'branch:id,code,name']);
+            $department->loadMissing('company:id,code,name');
             $fromSnapshot = $this->snapshot($lockedAsset);
+
+            $number = $this->numberingService->generate(
+                NumberingModuleCode::AssetTransfer,
+                [
+                    'company' => $company->code,
+                    'department' => $department->code,
+                    'branch' => $location->branch?->code,
+                    'location' => $location->code,
+                    'asset_type' => $lockedAsset->type?->code,
+                    'category' => $lockedAsset->category?->code,
+                    'product' => $lockedAsset->product?->code,
+                    'source_company' => $lockedAsset->company?->code,
+                    'source_department' => $lockedAsset->department?->code,
+                    'source_branch' => $lockedAsset->branch?->code,
+                    'source_location' => $lockedAsset->location?->code,
+                    'target_company' => $company->code,
+                    'target_department' => $department->code,
+                    'target_branch' => $location->branch?->code,
+                    'target_location' => $location->code,
+                    'document_type' => 'ASSET_TRANSFER',
+                ],
+            );
 
             $lockedAsset->fill([
                 'company_id' => $company->id,
@@ -130,7 +150,7 @@ class AssetTransferService
             $lockedAsset->setRelation('branch', $location->branch);
 
             return $lockedAsset->transferHistories()->create([
-                'number' => 'TRF-'.now()->format('Ymd').'-'.Str::upper(Str::substr((string) Str::ulid(), -8)),
+                'number' => $number,
                 'from_snapshot' => $fromSnapshot,
                 'to_snapshot' => $this->snapshot($lockedAsset),
                 'effective_at' => $data['effective_at'],

@@ -63,7 +63,7 @@ class InventoryRequestWorkflowTest extends TestCase
         $this->assertSame(InventoryRequest::STATUS_FULFILLED, $inventoryRequest->fresh()->status);
         $this->assertSame('4.000', $requestItem->fresh()->fulfilled_quantity);
         $this->assertSame(1.0, $this->balance($product, $warehouse));
-        $this->assertDatabaseCount('inventory_documents', 2);
+        $this->assertDatabaseCount('trx_inventory_documents', 2);
         $this->assertDatabaseCount('approval_actions', 1);
     }
 
@@ -89,7 +89,7 @@ class InventoryRequestWorkflowTest extends TestCase
         $this->actingAs($approver)->post(route('approval.inbox.reject', $approvalRequest), ['remarks' => 'Tidak ada kebutuhan yang disetujui.'])->assertSessionHasNoErrors();
 
         $this->assertSame(InventoryRequest::STATUS_REJECTED, $inventoryRequest->fresh()->status);
-        $this->assertDatabaseCount('inventory_documents', 0);
+        $this->assertDatabaseCount('trx_inventory_documents', 0);
         $this->assertDatabaseHas('approval_actions', [
             'approval_request_id' => $approvalRequest->id,
             'action' => 'REJECTED',
@@ -107,7 +107,7 @@ class InventoryRequestWorkflowTest extends TestCase
             ]],
         ])->assertSessionHasErrors('inventory_request');
 
-        $this->assertDatabaseCount('inventory_documents', 0);
+        $this->assertDatabaseCount('trx_inventory_documents', 0);
     }
 
     public function test_user_cannot_view_another_departments_inventory_request(): void

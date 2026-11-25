@@ -2,6 +2,7 @@
 import { onMounted } from 'vue'
 import { route } from 'ziggy-js'
 import Button from 'primevue/button'
+import PrintDocumentHeader from '@/components/print/PrintDocumentHeader.vue'
 
 interface MaintenanceComponent {
     id: string
@@ -36,8 +37,17 @@ interface MaintenancePrintRecord {
     requested_by: { name: string } | null
 }
 
+interface LatestService {
+    id: string
+    number: string
+    maintenance_type: string
+    completed_at: string
+    work_summary: string | null
+}
+
 const props = defineProps<{
     maintenance: MaintenancePrintRecord
+    latest_service: LatestService | null
     auto_print: boolean
     close_after_print: boolean
 }>()
@@ -90,13 +100,8 @@ onMounted(() => {
             <Button label="Cetak / Simpan PDF" icon="pi pi-print" @click="printDocument" />
         </div>
 
-        <article class="print-document space-y-5 border border-gray-300 p-8 text-[11px] leading-relaxed">
-            <header class="border-b-2 border-purple-900 pb-4 text-center">
-                <p class="text-xs font-bold uppercase tracking-[0.25em] text-purple-900">Asset Management</p>
-                <h1 class="mt-2 text-2xl font-bold uppercase tracking-wide">Maintenance Request</h1>
-                <p class="mt-1 text-sm font-semibold">{{ maintenance.number }}</p>
-                <p class="mt-1 text-[10px] text-gray-500">Dokumen pengajuan pemeriksaan, estimasi biaya, dan persetujuan pekerjaan.</p>
-            </header>
+        <article class="print-document space-y-3 border border-gray-300 p-5 text-[11px] leading-snug">
+            <PrintDocumentHeader domain="asset-management" title="Maintenance Request" :number="maintenance.number" :company-name="maintenance.asset.company.name" :date-label="`Tanggal pengajuan · ${date(maintenance.requested_at)}`" />
 
             <section class="grid grid-cols-2 gap-x-8 gap-y-2">
                 <p><strong>Tanggal pengajuan:</strong> {{ date(maintenance.requested_at) }}</p>
@@ -108,8 +113,8 @@ onMounted(() => {
             </section>
 
             <section class="overflow-hidden rounded border border-gray-400">
-                <h2 class="bg-purple-950 px-3 py-2 font-bold uppercase text-white">Identitas Aset</h2>
-                <div class="grid grid-cols-2 gap-x-8 gap-y-2 p-3">
+                <h2 class="border-b border-gray-300 px-3 py-1.5 text-xs font-bold text-purple-900">Identitas aset</h2>
+                <div class="grid grid-cols-2 gap-x-6 gap-y-1.5 p-2">
                     <p><strong>Kode aset:</strong> {{ maintenance.asset.number }}</p>
                     <p><strong>Produk:</strong> {{ maintenance.asset.product.code }} · {{ maintenance.asset.product.name }}</p>
                     <p><strong>Serial number:</strong> {{ maintenance.asset.serial_number ?? 'Tidak ada' }}</p>
@@ -119,39 +124,50 @@ onMounted(() => {
                 </div>
             </section>
 
+            <section class="break-inside-avoid rounded border border-gray-400 px-3 py-2">
+                <h2 class="text-xs font-bold text-purple-900">Maintenance / service terakhir</h2>
+                <div v-if="latest_service" class="mt-1 grid grid-cols-3 gap-2">
+                    <p><strong>Nomor:</strong> {{ latest_service.number }}</p>
+                    <p><strong>Tanggal selesai:</strong> {{ date(latest_service.completed_at) }}</p>
+                    <p><strong>Jenis:</strong> {{ latest_service.maintenance_type === 'PREVENTIVE' ? 'Preventive' : 'Corrective' }}</p>
+                    <p class="col-span-3"><strong>Hasil:</strong> {{ latest_service.work_summary || '-' }}</p>
+                </div>
+                <p v-else class="mt-1">-</p>
+            </section>
+
             <section class="space-y-3">
-                <div><h2 class="font-bold uppercase text-purple-950">Keluhan / kebutuhan</h2><p class="mt-1 whitespace-pre-line">{{ maintenance.issue_description }}</p></div>
-                <div><h2 class="font-bold uppercase text-purple-950">Hasil pemeriksaan awal</h2><p class="mt-1 whitespace-pre-line">{{ maintenance.inspection_result || 'Belum dicatat.' }}</p></div>
-                <div class="grid grid-cols-2 gap-4">
+                <div><h2 class="text-xs font-bold text-purple-900">Keluhan / kebutuhan</h2><p class="mt-1 whitespace-pre-line">{{ maintenance.issue_description }}</p></div>
+                <div><h2 class="text-xs font-bold text-purple-900">Hasil pemeriksaan awal</h2><p class="mt-1 whitespace-pre-line">{{ maintenance.inspection_result || 'Belum dicatat.' }}</p></div>
+                <div class="grid grid-cols-2 gap-2">
                     <p><strong>Kondisi saat diperiksa:</strong> {{ maintenance.reported_condition }}</p>
                     <p><strong>Pelaksana:</strong> {{ maintenance.execution_mode === 'INTERNAL' ? 'Tim Internal IT / GA' : 'Vendor Eksternal' }}</p>
                 </div>
             </section>
 
             <section class="overflow-hidden rounded border border-gray-400">
-                <h2 class="bg-purple-950 px-3 py-2 font-bold uppercase text-white">{{ maintenance.execution_mode === 'INTERNAL' ? 'Estimasi Biaya' : 'Vendor dan Estimasi Biaya' }}</h2>
-                <div class="grid grid-cols-2 gap-x-8 gap-y-2 p-3">
+                <h2 class="border-b border-gray-300 px-3 py-1.5 text-xs font-bold text-purple-900">{{ maintenance.execution_mode === 'INTERNAL' ? 'Estimasi biaya' : 'Vendor dan estimasi biaya' }}</h2>
+                <div class="grid grid-cols-2 gap-x-6 gap-y-1.5 p-2">
                     <p v-if="maintenance.execution_mode === 'VENDOR'"><strong>Vendor:</strong> {{ maintenance.vendor?.name ?? '-' }}</p>
                     <p v-if="maintenance.execution_mode === 'VENDOR'"><strong>Kontak vendor:</strong> {{ maintenance.vendor?.phone ?? maintenance.vendor?.email ?? '-' }}</p>
                     <p v-if="maintenance.execution_mode === 'VENDOR'"><strong>Alamat vendor:</strong> {{ maintenance.vendor?.address ?? '-' }}</p>
-                    <p class="text-base"><strong>Total estimasi:</strong> {{ money(maintenance.estimated_cost) }}</p>
+                    <p><strong>Total estimasi:</strong> {{ money(maintenance.estimated_cost) }}</p>
                 </div>
             </section>
 
             <section v-if="maintenance.execution_mode === 'INTERNAL'" class="overflow-hidden rounded border border-gray-400">
-                <h2 class="bg-purple-950 px-3 py-2 font-bold uppercase text-white">Komponen yang Dibutuhkan</h2>
+                <h2 class="border-b border-gray-300 px-3 py-1.5 text-xs font-bold text-purple-900">Komponen yang dibutuhkan</h2>
                 <table v-if="maintenance.components.length" class="w-full border-collapse text-left">
-                    <thead><tr class="bg-gray-100"><th class="border border-gray-500 p-2">Komponen</th><th class="border border-gray-500 p-2">Jumlah</th><th class="border border-gray-500 p-2">Harga Satuan</th><th class="border border-gray-500 p-2">Tanggal Dibutuhkan</th><th class="border border-gray-500 p-2">Subtotal</th></tr></thead>
-                    <tbody><tr v-for="component in maintenance.components" :key="component.id"><td class="border border-gray-500 p-2">{{ component.component_name }}</td><td class="border border-gray-500 p-2">{{ Number(component.quantity) }}</td><td class="border border-gray-500 p-2">{{ money(component.estimated_unit_cost) }}</td><td class="border border-gray-500 p-2">{{ date(component.needed_at) }}</td><td class="border border-gray-500 p-2">{{ money(String(Number(component.quantity) * Number(component.estimated_unit_cost))) }}</td></tr></tbody>
+                    <thead><tr class="bg-gray-100"><th class="border border-gray-500 p-1">Komponen</th><th class="border border-gray-500 p-1">Jumlah</th><th class="border border-gray-500 p-1">Harga Satuan</th><th class="border border-gray-500 p-1">Tanggal Dibutuhkan</th><th class="border border-gray-500 p-1">Subtotal</th></tr></thead>
+                    <tbody><tr v-for="component in maintenance.components" :key="component.id"><td class="border border-gray-500 p-1">{{ component.component_name }}</td><td class="border border-gray-500 p-1">{{ Number(component.quantity) }}</td><td class="border border-gray-500 p-1">{{ money(component.estimated_unit_cost) }}</td><td class="border border-gray-500 p-1">{{ date(component.needed_at) }}</td><td class="border border-gray-500 p-1">{{ money(String(Number(component.quantity) * Number(component.estimated_unit_cost))) }}</td></tr></tbody>
                 </table>
                 <p v-else class="p-3">Tidak ada komponen pembelian yang dicatat untuk request ini.</p>
             </section>
 
             <section class="break-inside-avoid">
-                <h2 class="mb-2 text-center font-bold uppercase text-purple-950">Keputusan Persetujuan</h2>
+                <h2 class="mb-2 text-center text-xs font-bold text-purple-900">Keputusan persetujuan</h2>
                 <table class="w-full border-collapse text-center">
                     <thead><tr><th class="border border-gray-700 bg-gray-100 p-2">Petugas Maintenance</th><th class="border border-gray-700 bg-gray-100 p-2">Management / Pemberi Persetujuan</th></tr></thead>
-                    <tbody><tr><td class="h-24 border border-gray-700 p-2 align-bottom"><span class="font-semibold">{{ maintenance.requested_by?.name ?? '-' }}</span><br /><span class="text-[9px] text-gray-500">Pemohon / pencatat</span></td><td class="h-24 border border-gray-700 p-2 align-bottom"><span class="font-semibold">Tanda tangan dan tanggal persetujuan</span></td></tr></tbody>
+                    <tbody><tr><td class="h-16 border border-gray-700 p-2 align-bottom"><span class="font-semibold">{{ maintenance.requested_by?.name ?? '-' }}</span><br /><span class="text-[9px] text-gray-500">Pemohon / pencatat</span></td><td class="h-16 border border-gray-700 p-2 align-bottom"><span class="font-semibold">Tanda tangan dan tanggal persetujuan</span></td></tr></tbody>
                 </table>
             </section>
 
@@ -161,9 +177,10 @@ onMounted(() => {
 </template>
 
 <style>
-@page { size: A4; margin: 12mm; }
+@page { size: A4; margin: 8mm; }
 @media print {
     body { background: #fff !important; }
     .print-document { border: 0 !important; padding: 0 !important; }
+    .print-document > * { break-inside: avoid-page; }
 }
 </style>

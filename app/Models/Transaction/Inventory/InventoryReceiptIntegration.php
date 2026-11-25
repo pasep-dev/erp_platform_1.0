@@ -26,7 +26,7 @@ class InventoryReceiptIntegration extends Model
 
     public const STATUS_FAILED = 'FAILED';
 
-    protected $table = 'inventory_receipt_integrations';
+    protected $table = 'trx_inventory_receipt_integrations';
 
     protected $fillable = [
         'goods_receipt_item_id',

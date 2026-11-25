@@ -2,8 +2,9 @@
 
 namespace App\Services\Transaction\Procurement;
 
+use App\Enums\NumberingModuleCode;
 use App\Models\Master\Organization\Location;
-use App\Models\NumberingDocument;
+use App\Models\Master\Procurement\Vendor;
 use App\Models\Transaction\Procurement\GoodsReceipt;
 use App\Models\Transaction\Procurement\GoodsReceiptItem;
 use App\Models\Transaction\Procurement\PurchaseOrder;
@@ -31,7 +32,7 @@ class GoodsReceiptManagementService
     {
         $purchaseOrders = PurchaseOrder::query()
             ->with([
-                'purchaseRequest:id,number',
+                'purchaseRequest:id,number,created_at,approved_at',
                 'company:id,name',
                 'department:id,name',
                 'vendor:id,code,name',
@@ -60,6 +61,11 @@ class GoodsReceiptManagementService
                     'company' => $purchaseOrder->company?->name,
                     'department' => $purchaseOrder->department?->name,
                     'queued_at' => $purchaseOrder->submitted_at?->toDateString(),
+                    'timeline' => $this->receiptTimeline(
+                        $purchaseOrder->purchaseRequest,
+                        $purchaseOrder,
+                        $openItems->isEmpty() ? 'RECEIVED' : ($acceptedQuantity > 0 ? 'PARTIALLY_RECEIVED' : 'WAITING_RECEIPT'),
+                    ),
                     'queue_status' => $openItems->isEmpty()
                         ? 'RECEIVED'
                         : ($acceptedQuantity > 0 ? 'PARTIALLY_RECEIVED' : 'WAITING_RECEIPT'),
@@ -108,6 +114,11 @@ class GoodsReceiptManagementService
                     'company' => $purchaseRequest->company?->name,
                     'department' => $purchaseRequest->department?->name,
                     'queued_at' => $purchaseRequest->approved_at?->toDateString(),
+                    'timeline' => $this->receiptTimeline(
+                        $purchaseRequest,
+                        null,
+                        $openVendorItems->isEmpty() ? 'RECEIVED' : ($acceptedQuantity > 0 ? 'PARTIALLY_RECEIVED' : 'WAITING_RECEIPT'),
+                    ),
                     'queue_status' => $openVendorItems->isEmpty()
                         ? 'RECEIVED'
                         : ($acceptedQuantity > 0 ? 'PARTIALLY_RECEIVED' : 'WAITING_RECEIPT'),
@@ -121,6 +132,32 @@ class GoodsReceiptManagementService
         }
 
         return [...$purchaseOrders, ...$requestSources];
+    }
+
+    /** @return array<int, array{label: string, at: ?string, status: string}> */
+    private function receiptTimeline(PurchaseRequest $purchaseRequest, ?PurchaseOrder $purchaseOrder, string $receiptStatus): array
+    {
+        $timeline = [
+            ['label' => 'PR dibuat', 'at' => $purchaseRequest->created_at?->toIso8601String(), 'status' => $purchaseRequest->created_at === null ? 'waiting' : 'done'],
+            ['label' => 'PR disetujui', 'at' => $purchaseRequest->approved_at?->toIso8601String(), 'status' => $purchaseRequest->approved_at === null ? 'waiting' : 'done'],
+        ];
+
+        if ($purchaseOrder !== null) {
+            $timeline[] = ['label' => 'PO dibuat', 'at' => $purchaseOrder->created_at?->toIso8601String(), 'status' => $purchaseOrder->created_at === null ? 'waiting' : 'done'];
+            $timeline[] = ['label' => 'PO dikirim', 'at' => $purchaseOrder->submitted_at?->toIso8601String(), 'status' => $purchaseOrder->submitted_at === null ? 'waiting' : 'done'];
+        }
+
+        $timeline[] = [
+            'label' => match ($receiptStatus) {
+                'RECEIVED' => 'GR selesai',
+                'PARTIALLY_RECEIVED' => 'Menunggu sisa GR',
+                default => 'Menunggu GR',
+            },
+            'at' => null,
+            'status' => $receiptStatus === 'RECEIVED' ? 'done' : 'current',
+        ];
+
+        return $timeline;
     }
 
     /**
@@ -191,18 +228,24 @@ class GoodsReceiptManagementService
             );
             $receiptItems = $this->validateReceiptItems($source['items'], $data['items']);
             $sourceModel = $source['model'];
-            $this->validateDestinationLocations(
-                $sourceModel->company_id,
-                $data['warehouse_location_id'],
-                $data['storage_location_id'] ?? null,
-            );
+            $warehouseId = $data['warehouse_location_id'] ?? null;
+            $this->validateDestinationLocations($sourceModel->company_id, $warehouseId, $data['storage_location_id'] ?? null);
+            $warehouseLocation = $warehouseId === null ? null : Location::query()
+                ->with('branch:id,code')
+                ->findOrFail($warehouseId);
+            $vendorCode = $sourceModel instanceof PurchaseOrder
+                ? $sourceModel->vendor?->code
+                : Vendor::query()->whereKey($data['vendor_id'] ?? null)->value('code');
 
             $receipt = GoodsReceipt::query()->create([
                 'number' => $this->numberingService->generate(
-                    NumberingDocument::CODE_GOODS_RECEIPT,
+                    NumberingModuleCode::GoodsReceipt,
                     [
                         'company' => $sourceModel->company->code,
+                        'branch' => $warehouseLocation?->branch?->code ?? 'NA',
+                        'location' => $warehouseLocation?->code ?? 'NA',
                         'document_type' => 'GR',
+                        'vendor' => $vendorCode,
                         'department' => $sourceModel->department->code,
                     ],
                 ),
@@ -211,7 +254,7 @@ class GoodsReceiptManagementService
                 'purchase_request_id' => $sourceModel instanceof PurchaseRequest ? $sourceModel->id : null,
                 'company_id' => $sourceModel->company_id,
                 'department_id' => $sourceModel->department_id,
-                'warehouse_location_id' => $data['warehouse_location_id'],
+                'warehouse_location_id' => $warehouseId,
                 'storage_location_id' => $data['storage_location_id'] ?? null,
                 'vendor_id' => $sourceModel instanceof PurchaseOrder ? $sourceModel->vendor_id : ($data['vendor_id'] ?? null),
                 'received_at' => $data['received_at'],
@@ -247,15 +290,12 @@ class GoodsReceiptManagementService
                 : null;
             $source = $this->loadSource($lockedReceipt->source_type, $sourceId, $vendorId, lock: true);
             $receiptItems = $this->validateReceiptItems($source['items'], $data['items']);
-            $this->validateDestinationLocations(
-                $lockedReceipt->company_id,
-                $data['warehouse_location_id'],
-                $data['storage_location_id'] ?? null,
-            );
+            $warehouseId = $data['warehouse_location_id'] ?? null;
+            $this->validateDestinationLocations($lockedReceipt->company_id, $warehouseId, $data['storage_location_id'] ?? null);
 
             $lockedReceipt->update([
                 'received_at' => $data['received_at'],
-                'warehouse_location_id' => $data['warehouse_location_id'],
+                'warehouse_location_id' => $warehouseId,
                 'storage_location_id' => $data['storage_location_id'] ?? null,
                 'delivery_note_number' => $data['delivery_note_number'] ?? null,
                 'remarks' => $data['remarks'] ?? null,
@@ -345,8 +385,18 @@ class GoodsReceiptManagementService
         });
     }
 
-    private function validateDestinationLocations(string $companyId, string $warehouseId, ?string $storageId): void
+    private function validateDestinationLocations(string $companyId, ?string $warehouseId, ?string $storageId): void
     {
+        if ($warehouseId === null) {
+            if ($storageId !== null) {
+                throw ValidationException::withMessages([
+                    'storage_location_id' => 'Sublokasi hanya dapat dipilih jika gudang tujuan dipilih.',
+                ]);
+            }
+
+            return;
+        }
+
         $warehouse = Location::query()
             ->where('company_id', $companyId)
             ->where('is_active', true)

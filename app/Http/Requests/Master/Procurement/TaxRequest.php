@@ -25,7 +25,7 @@ class TaxRequest extends FormRequest
                 'string',
                 'max:50',
                 'alpha_dash',
-                Rule::unique('mst_taxes', 'code')
+                Rule::unique('mst_prc_taxes', 'code')
                     ->ignore($taxId)
                     ->whereNull('deleted_at'),
             ],
@@ -41,6 +41,11 @@ class TaxRequest extends FormRequest
                 'numeric',
                 'min:0',
                 'max:100',
+            ],
+
+            'category' => [
+                'required',
+                Rule::in(['ADDITIVE', 'WITHHOLDING']),
             ],
 
             'description' => [
@@ -62,6 +67,7 @@ class TaxRequest extends FormRequest
             'code' => 'tax code',
             'name' => 'tax name',
             'rate' => 'tax rate',
+            'category' => 'tax category',
             'description' => 'description',
             'is_active' => 'active status',
         ];

@@ -60,7 +60,7 @@ return new class extends Migration
                 'code' => 'ASSET',
                 'name' => 'Registrasi Aset',
                 'category' => 'Asset Management',
-                'default_pattern' => '{COMPANY}-{ASSET_TYPE}{SEQ}{BRANCH}',
+                'default_pattern' => '{COMPANY}-{ASSET_TYPE}-{DEPARTMENT}{SEQ}{BRANCH}',
                 'sequence_length' => 3,
                 'reset_period' => 'never',
                 'is_active' => true,

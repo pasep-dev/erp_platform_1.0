@@ -55,9 +55,8 @@ const cancel = () => {
 
     <CrudForm
         title="Edit Asset Type"
-        description="Perbarui data jenis aset."
-        submit-label="Simpan Perubahan"
-        submit-processing-label="Memperbarui..."
+        submit-label="Submit Changes"
+        submit-processing-label="Updating..."
         :processing="form.processing"
         @submit="submit"
         @cancel="cancel"

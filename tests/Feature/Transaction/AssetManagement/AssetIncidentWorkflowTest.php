@@ -47,7 +47,7 @@ class AssetIncidentWorkflowTest extends TestCase
         $incident = AssetIncident::query()->firstOrFail();
         $this->assertSame('GOOD', $asset->fresh()->condition);
         $this->assertSame(Asset::STATUS_ACTIVE, $asset->fresh()->status);
-        $this->assertDatabaseHas('asset_incident_events', [
+        $this->assertDatabaseHas('trx_asset_incident_events', [
             'asset_incident_id' => $incident->id,
             'event_type' => 'REPORTED',
             'status_to' => AssetIncident::STATUS_REPORTED,
@@ -72,7 +72,7 @@ class AssetIncidentWorkflowTest extends TestCase
 
         $this->assertSame(AssetIncident::STATUS_RESOLVED, $incident->fresh()->status);
         $this->assertSame('NEEDS_REPAIR', $asset->fresh()->condition);
-        $this->assertDatabaseHas('asset_incident_events', [
+        $this->assertDatabaseHas('trx_asset_incident_events', [
             'asset_incident_id' => $incident->id,
             'event_type' => 'RESOLVED',
             'condition_from' => 'GOOD',
@@ -109,7 +109,7 @@ class AssetIncidentWorkflowTest extends TestCase
             ->assertSessionHasNoErrors();
 
         $this->assertSame(Asset::STATUS_MISSING, $asset->fresh()->status);
-        $this->assertDatabaseHas('asset_incident_events', [
+        $this->assertDatabaseHas('trx_asset_incident_events', [
             'asset_incident_id' => $incident->id,
             'asset_status_from' => Asset::STATUS_ACTIVE,
             'asset_status_to' => Asset::STATUS_MISSING,
@@ -142,7 +142,7 @@ class AssetIncidentWorkflowTest extends TestCase
         $this->assertSame(AssetIncident::STATUS_DISMISSED, $incident->fresh()->status);
         $this->assertSame('GOOD', $asset->fresh()->condition);
         $this->assertSame(Asset::STATUS_ACTIVE, $asset->fresh()->status);
-        $this->assertDatabaseHas('asset_incident_events', [
+        $this->assertDatabaseHas('trx_asset_incident_events', [
             'asset_incident_id' => $incident->id,
             'event_type' => 'DISMISSED',
             'condition_from' => 'GOOD',
@@ -169,7 +169,7 @@ class AssetIncidentWorkflowTest extends TestCase
             ])
             ->assertForbidden();
 
-        $this->assertDatabaseCount('asset_incidents', 0);
+        $this->assertDatabaseCount('trx_asset_incidents', 0);
     }
 
     public function test_incident_index_displays_persisted_incidents(): void

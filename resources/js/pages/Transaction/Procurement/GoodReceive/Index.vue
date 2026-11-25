@@ -43,6 +43,11 @@ interface ReceiptSource {
     received_quantity: number
     outstanding_quantity: number
     receipts: ReceiptHistory[]
+    timeline: Array<{
+        label: string
+        at: string | null
+        status: 'done' | 'current' | 'waiting'
+    }>
 }
 
 const props = defineProps<{
@@ -206,6 +211,14 @@ function statusSeverity(status: ReceiptSource['queue_status']): 'success' | 'war
 function date(value: string): string {
     return new Intl.DateTimeFormat('id-ID', { dateStyle: 'medium' }).format(new Date(value))
 }
+
+function dateTime(value: string | null): string {
+    if (!value) {
+        return 'Menunggu'
+    }
+
+    return new Intl.DateTimeFormat('id-ID', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value))
+}
 </script>
 
 <template>
@@ -217,6 +230,19 @@ function date(value: string): string {
                     <div class="font-semibold text-gray-900 dark:text-white">{{ selectedSource.source_number }}</div>
                     <div class="mt-1 text-gray-500 dark:text-gray-400">{{ sourceTypeLabel(selectedSource.source_type) }} · {{ selectedSource.vendor ?? 'Tidak ditentukan di PR' }}</div>
                 </div>
+                <section aria-label="Alur dokumen" class="rounded-lg border border-gray-200 p-4 dark:border-gray-700">
+                    <h3 class="text-sm font-semibold text-gray-900 dark:text-white">Alur dokumen</h3>
+                    <ol class="mt-3 space-y-3">
+                        <li v-for="(step, index) in selectedSource.timeline" :key="`${step.label}-${index}`" class="flex items-start gap-3">
+                            <span class="mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full" :class="step.status === 'done' ? 'bg-emerald-500' : 'bg-amber-500'" />
+                            <div class="flex min-w-0 flex-1 items-center justify-between gap-3 text-sm">
+                                <span :class="step.status === 'current' ? 'font-semibold text-amber-700 dark:text-amber-400' : 'text-gray-700 dark:text-gray-300'">{{ step.label }}</span>
+                                <time v-if="step.at" class="shrink-0 text-xs text-gray-500 dark:text-gray-400">{{ dateTime(step.at) }}</time>
+                                <span v-else class="shrink-0 text-xs text-gray-500 dark:text-gray-400">{{ step.status === 'done' ? 'Selesai' : 'Menunggu' }}</span>
+                            </div>
+                        </li>
+                    </ol>
+                </section>
                 <p v-if="selectedSource.receipts.length === 0" class="py-6 text-center text-sm text-gray-500">Belum ada dokumen GR untuk sumber ini.</p>
                 <article v-for="receipt in selectedSource.receipts" :key="receipt.id" class="rounded-lg border border-gray-200 p-4 dark:border-gray-700">
                     <div class="flex flex-wrap items-start justify-between gap-3">

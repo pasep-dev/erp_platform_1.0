@@ -2,18 +2,25 @@
 
 namespace App\Services\AssetManagement;
 
+use App\Enums\NumberingModuleCode;
+use App\Models\Master\Organization\Company;
+use App\Models\Master\Organization\Department;
+use App\Models\Master\Organization\Location;
+use App\Models\Master\Product\Category;
 use App\Models\Transaction\AssetManagement\Asset;
 use App\Models\Transaction\AssetManagement\AssetAuditItem;
 use App\Models\Transaction\AssetManagement\AssetAuditSession;
 use App\Models\User;
+use App\Services\NumberingService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 class AssetAuditService
 {
+    public function __construct(private readonly NumberingService $numberingService) {}
+
     /**
      * @param  array<string, mixed>  $data
      */
@@ -33,11 +40,34 @@ class AssetAuditService
                 'company' => $this->optionName('mst_org_companies', $data['company_id'] ?? null),
                 'department' => $this->optionName('mst_org_departments', $data['department_id'] ?? null),
                 'location' => $this->optionName('mst_org_locations', $data['location_id'] ?? null),
-                'category' => $this->optionName('mst_asset_categories', $data['category_id'] ?? null),
+                'category' => $this->optionName('mst_product_categories', $data['category_id'] ?? null),
             ];
 
+            $company = isset($data['company_id'])
+                ? Company::query()->find($data['company_id'])
+                : null;
+            $department = isset($data['department_id'])
+                ? Department::query()->with('company')->find($data['department_id'])
+                : null;
+            $location = isset($data['location_id'])
+                ? Location::query()->with(['company', 'branch'])->find($data['location_id'])
+                : null;
+            $category = isset($data['category_id'])
+                ? Category::query()->find($data['category_id'])
+                : null;
+
             $session = AssetAuditSession::query()->create([
-                'number' => 'AUD-'.now()->format('Ymd').'-'.Str::upper(Str::substr((string) Str::ulid(), -8)),
+                'number' => $this->numberingService->generate(
+                    NumberingModuleCode::AssetAudit,
+                    [
+                        'company' => $company?->code ?? $department?->company?->code ?? $location?->company?->code ?? 'MULTI',
+                        'department' => $department?->code ?? 'MULTI',
+                        'branch' => $location?->branch?->code ?? 'MULTI',
+                        'location' => $location?->code ?? 'MULTI',
+                        'category' => $category?->code ?? 'MULTI',
+                        'document_type' => 'ASSET_AUDIT',
+                    ],
+                ),
                 'company_id' => $data['company_id'] ?? null,
                 'department_id' => $data['department_id'] ?? null,
                 'location_id' => $data['location_id'] ?? null,
@@ -78,7 +108,7 @@ class AssetAuditService
                     ])->all();
 
                     $session->items()->createMany($items);
-                }, 'assets.id', 'id');
+                }, 'trx_assets.id', 'id');
 
             return $session;
         }, 3);

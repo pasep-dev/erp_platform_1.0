@@ -26,6 +26,11 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'pr_estimated_unit_price',
     'unit_price',
     'tax_included',
+    'tax_id',
+    'tax_code',
+    'tax_name',
+    'tax_rate',
+    'tax_category',
     'required_date',
     'delivery_address',
     'vendor_pic',
@@ -39,7 +44,7 @@ class PurchaseOrderItem extends Model
     use HasDepartmentAccessScope;
     use HasUlids;
 
-    protected $table = 'purchase_order_items';
+    protected $table = 'trx_purchase_order_items';
 
     protected $fillable = [
         'purchase_order_id',
@@ -55,6 +60,11 @@ class PurchaseOrderItem extends Model
         'pr_estimated_unit_price',
         'unit_price',
         'tax_included',
+        'tax_id',
+        'tax_code',
+        'tax_name',
+        'tax_rate',
+        'tax_category',
         'required_date',
         'delivery_address',
         'vendor_pic',
@@ -70,6 +80,7 @@ class PurchaseOrderItem extends Model
             'pr_estimated_unit_price' => 'decimal:2',
             'unit_price' => 'decimal:2',
             'tax_included' => 'boolean',
+            'tax_rate' => 'decimal:4',
             'required_date' => 'date:Y-m-d',
         ];
     }

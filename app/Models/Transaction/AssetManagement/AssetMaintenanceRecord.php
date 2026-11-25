@@ -14,6 +14,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class AssetMaintenanceRecord extends Model
 {
+    protected $table = 'trx_asset_maintenance_records';
+
     use HasBranchAccessScope;
     use HasDepartmentAccessScope;
     use HasUlids;

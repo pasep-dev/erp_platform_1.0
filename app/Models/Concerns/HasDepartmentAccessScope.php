@@ -37,7 +37,7 @@ trait HasDepartmentAccessScope
                         $relatedQuery->whereIn($relatedModel->qualifyColumn('department_id'), $departmentIds);
                     } elseif (method_exists($relatedModel, 'asset')) {
                         $relatedQuery->whereHas('asset', fn (Builder $assetQuery) => $assetQuery
-                            ->whereIn('assets.department_id', $departmentIds));
+                            ->whereIn('trx_assets.department_id', $departmentIds));
                     }
                 });
             }

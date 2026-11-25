@@ -4,14 +4,15 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Auth\LoginRequest;
+use App\Services\ActivityLogger;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
-use App\Services\ActivityLogger;
 use Symfony\Component\HttpFoundation\Response as SymfonyResponse;
 
 class AuthenticatedSessionController extends Controller
@@ -29,14 +30,14 @@ class AuthenticatedSessionController extends Controller
 
         $throttleKey = Str::transliterate(
             Str::lower($request->string('email')->toString())
-                . '|'
-                . $request->ip(),
+                .'|'
+                .$request->ip(),
         );
 
         if (RateLimiter::tooManyAttempts($throttleKey, 5)) {
             $seconds = RateLimiter::availableIn($throttleKey);
 
-            throw \Illuminate\Validation\ValidationException::withMessages([
+            throw ValidationException::withMessages([
                 'email' => "Terlalu banyak percobaan login. Silakan coba lagi dalam {$seconds} detik.",
             ]);
         }
@@ -54,9 +55,10 @@ class AuthenticatedSessionController extends Controller
                 action: 'LOGIN_FAILED',
                 module: 'Authentication',
                 description: 'Login attempt failed.',
+                ignoreAuthenticatedUser: true,
             );
 
-            throw \Illuminate\Validation\ValidationException::withMessages([
+            throw ValidationException::withMessages([
                 'email' => 'Email atau password tidak valid.',
             ]);
         }

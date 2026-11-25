@@ -61,7 +61,7 @@ class ModelController extends Controller
     {
         $brands = Brand::query()
             ->where('is_active', true)
-            ->with('categories:id,code,name')
+            ->with('categories:id,code,name,parent_id')
             ->orderBy('name')
             ->get([
                 'id',
@@ -70,7 +70,7 @@ class ModelController extends Controller
             ]);
 
         $types = Type::query()
-            ->with('category:id,code,name')
+            ->with('category:id,code,name,parent_id')
             ->where('is_active', true)
             ->orderBy('name')
             ->get([
@@ -105,7 +105,7 @@ class ModelController extends Controller
                     ->where('is_active', true)
                     ->orWhere('id', $model->brand_id);
             })
-            ->with('categories:id,code,name')
+            ->with('categories:id,code,name,parent_id')
             ->orderBy('name')
             ->get([
                 'id',
@@ -114,7 +114,7 @@ class ModelController extends Controller
             ]);
 
         $types = Type::query()
-            ->with('category:id,code,name')
+            ->with('category:id,code,name,parent_id')
             ->where(function ($query) use ($model) {
                 $query
                     ->where('is_active', true)

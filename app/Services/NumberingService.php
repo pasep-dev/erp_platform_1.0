@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Enums\NumberingModuleCode;
 use App\Models\NumberingDocument;
 use App\Models\NumberingSequence;
 use Carbon\CarbonInterface;
@@ -11,11 +12,53 @@ use RuntimeException;
 
 class NumberingService
 {
-    public function hasActiveDocument(string $documentCode): bool
+    /**
+     * Preview the next number without reserving or incrementing its sequence.
+     *
+     * @param  array<string, scalar|null>  $parameters
+     */
+    public function preview(NumberingModuleCode $documentCode, array $parameters = []): ?string
+    {
+        $document = $this->activeDocument($documentCode);
+
+        if ($document === null) {
+            return null;
+        }
+
+        $this->validateNumberingDocument($document);
+
+        try {
+            $this->validatePatternParameters($document->pattern, $parameters, $documentCode);
+        } catch (RuntimeException) {
+            return null;
+        }
+
+        $now = now();
+        $scopeKey = $this->resolveScopeKey($document->pattern, $parameters);
+        $periodKey = $this->resolvePeriodKey($document->reset_period, $now);
+        $currentValue = NumberingSequence::query()
+            ->where('numbering_document_id', $document->id)
+            ->where('scope_key', $scopeKey)
+            ->where('period_key', $periodKey)
+            ->value('current_value');
+        $nextSequence = $currentValue === null
+            ? $document->sequence_start
+            : (int) $currentValue + 1;
+
+        return $this->formatNumber(
+            pattern: $document->pattern,
+            sequence: $nextSequence,
+            parameters: $parameters,
+            now: $now,
+            sequenceLength: $document->sequence_length,
+        );
+    }
+
+    public function hasActiveDocument(NumberingModuleCode $documentCode): bool
     {
         return NumberingDocument::query()
             ->whereHas('module', fn ($query) => $query->where('is_active', true))
-            ->where('code', $documentCode)
+            ->where('code', $documentCode->value)
             ->where('is_active', true)
             ->exists();
     }
@@ -26,7 +69,7 @@ class NumberingService
      * @param  array<string, scalar|null>  $parameters
      */
     public function generate(
-        string $documentCode,
+        NumberingModuleCode $documentCode,
         array $parameters = [],
     ): string {
         $now = now();
@@ -36,15 +79,11 @@ class NumberingService
             $parameters,
             $now,
         ): string {
-            $document = NumberingDocument::query()
-                ->whereHas('module', fn ($query) => $query->where('is_active', true))
-                ->where('code', $documentCode)
-                ->where('is_active', true)
-                ->first();
+            $document = $this->activeDocument($documentCode);
 
             if (! $document) {
                 throw new RuntimeException(
-                    "Numbering document [{$documentCode}] not found or inactive.",
+                    "Numbering document [{$documentCode->value}] not found or inactive.",
                 );
             }
 
@@ -53,6 +92,7 @@ class NumberingService
             $this->validatePatternParameters(
                 $document->pattern,
                 $parameters,
+                $documentCode,
             );
 
             $scopeKey = $this->resolveScopeKey(
@@ -113,6 +153,15 @@ class NumberingService
         });
     }
 
+    private function activeDocument(NumberingModuleCode $documentCode): ?NumberingDocument
+    {
+        return NumberingDocument::query()
+            ->whereHas('module', fn ($query) => $query->where('is_active', true))
+            ->where('code', $documentCode->value)
+            ->where('is_active', true)
+            ->first();
+    }
+
     private function resolveScopeKey(
         string $pattern,
         array $parameters,
@@ -150,6 +199,7 @@ class NumberingService
     private function validatePatternParameters(
         string $pattern,
         array $parameters,
+        NumberingModuleCode $documentCode,
     ): void {
         preg_match_all(
             '/\{([A-Z_]+)\}/',
@@ -167,6 +217,12 @@ class NumberingService
             )) {
                 throw new RuntimeException(
                     "Unsupported numbering placeholder [{$placeholder}].",
+                );
+            }
+
+            if (! in_array($placeholder, $documentCode->supportedPlaceholders(), true)) {
+                throw new RuntimeException(
+                    "Numbering placeholder [{$placeholder}] is unavailable for module [{$documentCode->value}].",
                 );
             }
 

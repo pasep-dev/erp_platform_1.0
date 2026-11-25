@@ -54,18 +54,23 @@ class GoodsReceiptWorkflowTest extends TestCase
                 ->component('Transaction/Procurement/GoodReceive/Index')
                 ->where('queue.0.source_type', GoodsReceipt::SOURCE_PURCHASE_ORDER)
                 ->where('queue.0.source_id', $purchaseOrder->id)
-                ->where('queue.0.outstanding_quantity', 5));
+                ->where('queue.0.outstanding_quantity', 5)
+                ->where('queue.0.timeline.0.label', 'PR dibuat')
+                ->where('queue.0.timeline.1.label', 'PR disetujui')
+                ->where('queue.0.timeline.2.label', 'PO dibuat')
+                ->where('queue.0.timeline.3.label', 'PO dikirim')
+                ->where('queue.0.timeline.4.label', 'Menunggu GR'));
 
         $firstReceipt = $this->createDraftReceipt($receiver, $purchaseOrder, 3, 2, 1, '1 unit has a damaged case.');
         $this->actingAs($receiver)
             ->post(route('transaction.procurement.goods-receipts.submit', $firstReceipt))
             ->assertRedirect(route('transaction.procurement.goods-receipts.show', $firstReceipt));
 
-        $this->assertDatabaseHas('purchase_orders', [
+        $this->assertDatabaseHas('trx_purchase_orders', [
             'id' => $purchaseOrder->id,
             'status' => 'PARTIALLY_RECEIVED',
         ]);
-        $this->assertDatabaseHas('goods_receipt_items', [
+        $this->assertDatabaseHas('trx_goods_receipt_items', [
             'goods_receipt_id' => $firstReceipt->id,
             'quantity_received' => 3,
             'quantity_accepted' => 2,
@@ -83,11 +88,11 @@ class GoodsReceiptWorkflowTest extends TestCase
             ->post(route('transaction.procurement.goods-receipts.submit', $secondReceipt))
             ->assertRedirect(route('transaction.procurement.goods-receipts.show', $secondReceipt));
 
-        $this->assertDatabaseHas('purchase_orders', [
+        $this->assertDatabaseHas('trx_purchase_orders', [
             'id' => $purchaseOrder->id,
             'status' => 'RECEIVED',
         ]);
-        $this->assertDatabaseHas('goods_receipts', [
+        $this->assertDatabaseHas('trx_goods_receipts', [
             'id' => $firstReceipt->id,
             'status' => GoodsReceipt::STATUS_POSTED,
             'posted_by' => $receiver->id,
@@ -146,13 +151,13 @@ class GoodsReceiptWorkflowTest extends TestCase
             ->post(route('transaction.procurement.goods-receipts.submit', $goodsReceipt))
             ->assertRedirect(route('transaction.procurement.goods-receipts.show', $goodsReceipt));
 
-        $this->assertDatabaseHas('goods_receipts', [
+        $this->assertDatabaseHas('trx_goods_receipts', [
             'id' => $goodsReceipt->id,
             'purchase_request_id' => $purchaseRequest->id,
             'purchase_order_id' => null,
             'status' => GoodsReceipt::STATUS_POSTED,
         ]);
-        $this->assertDatabaseHas('purchase_requests', [
+        $this->assertDatabaseHas('trx_purchase_requests', [
             'id' => $purchaseRequest->id,
             'status' => 'APPROVED',
         ]);
@@ -212,8 +217,8 @@ class GoodsReceiptWorkflowTest extends TestCase
         $receiptItem = $goodsReceipt->items()->firstOrFail();
         app(InventoryStockService::class)->capturePostedReceipt($goodsReceipt->fresh());
 
-        $this->assertDatabaseCount('inventory_stock_movements', 1);
-        $this->assertDatabaseHas('inventory_stock_movements', [
+        $this->assertDatabaseCount('trx_inventory_stock_movements', 1);
+        $this->assertDatabaseHas('trx_inventory_stock_movements', [
             'product_id' => $product->id,
             'location_id' => $warehouse->id,
             'source_line_id' => $receiptItem->id,
@@ -221,7 +226,7 @@ class GoodsReceiptWorkflowTest extends TestCase
             'direction' => 'IN',
         ]);
         $this->assertSame(2.0, app(InventoryStockService::class)->stockCard($product, $warehouse)['balance']);
-        $this->assertDatabaseHas('goods_receipts', [
+        $this->assertDatabaseHas('trx_goods_receipts', [
             'id' => $goodsReceipt->id,
             'status' => GoodsReceipt::STATUS_POSTED,
         ]);
@@ -242,6 +247,9 @@ class GoodsReceiptWorkflowTest extends TestCase
         [$receiver, $company, $department, $vendor, $serviceType, $unit] = $this->createProcurementContext('inventory-pending');
         $this->grantGoodsReceiptPermissions($receiver);
         $this->createGoodsReceiptNumbering();
+        NumberingDocument::query()->where('code', 'GOODS_RECEIPT')->update([
+            'pattern' => '{COMPANY}/{BRANCH}/{LOCATION}/{DOCUMENT_TYPE}/{DEPARTMENT}/{YYYY}/{SEQ}',
+        ]);
         $product = $this->createInventoryProduct('INV-PENDING-01');
         $purchaseRequest = $this->createPurchaseRequest($receiver, $company, $department, $serviceType, $unit, false, $vendor, $product);
 
@@ -263,15 +271,16 @@ class GoodsReceiptWorkflowTest extends TestCase
             ->post(route('transaction.procurement.goods-receipts.submit', $goodsReceipt))
             ->assertRedirect(route('transaction.procurement.goods-receipts.show', $goodsReceipt));
 
-        $this->assertDatabaseHas('goods_receipts', [
+        $this->assertDatabaseHas('trx_goods_receipts', [
             'id' => $goodsReceipt->id,
             'status' => GoodsReceipt::STATUS_POSTED,
+            'warehouse_location_id' => null,
         ]);
-        $this->assertDatabaseHas('inventory_receipt_integrations', [
+        $this->assertDatabaseHas('trx_inventory_receipt_integrations', [
             'goods_receipt_item_id' => $goodsReceipt->items()->firstOrFail()->id,
             'status' => InventoryReceiptIntegration::STATUS_PENDING_WAREHOUSE,
         ]);
-        $this->assertDatabaseCount('inventory_stock_movements', 0);
+        $this->assertDatabaseCount('trx_inventory_stock_movements', 0);
     }
 
     public function test_serial_tracked_receipt_adds_a_movement_for_each_recorded_serial(): void
@@ -328,14 +337,14 @@ class GoodsReceiptWorkflowTest extends TestCase
             ])
             ->assertSessionHasNoErrors();
 
-        $this->assertDatabaseCount('inventory_stock_movements', 2);
-        $this->assertDatabaseHas('inventory_stock_movements', [
+        $this->assertDatabaseCount('trx_inventory_stock_movements', 2);
+        $this->assertDatabaseHas('trx_inventory_stock_movements', [
             'product_id' => $product->id,
             'location_id' => $warehouse->id,
             'serial_number' => 'SN-001',
             'quantity' => 1,
         ]);
-        $this->assertDatabaseHas('inventory_receipt_integrations', [
+        $this->assertDatabaseHas('trx_inventory_receipt_integrations', [
             'id' => $integration->id,
             'status' => InventoryReceiptIntegration::STATUS_PROCESSED,
         ]);
@@ -379,7 +388,7 @@ class GoodsReceiptWorkflowTest extends TestCase
             ->assertRedirect(route('transaction.procurement.goods-receipts.show', $staleDraft))
             ->assertSessionHasErrors();
 
-        $this->assertDatabaseHas('goods_receipts', [
+        $this->assertDatabaseHas('trx_goods_receipts', [
             'id' => $staleDraft->id,
             'status' => GoodsReceipt::STATUS_DRAFT,
         ]);

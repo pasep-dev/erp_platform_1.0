@@ -26,7 +26,7 @@ interface MaintenanceRecord {
     estimated_cost: string | null
     started_at: string | null
     rejected_at: string | null
-    asset: { id: string; number: string; product: { code: string; name: string } }
+    asset: { id: string; number: string; product: { code: string; name: string } | null } | null
     vendor: { code: string; name: string } | null
     requested_by: { name: string } | null
 }
@@ -131,7 +131,7 @@ function completeMaintenance(): void {
             </DataTableToolbar>
             <CrudTable :columns="columns" :rows="rows" row-key="id" empty-message="Belum ada permintaan maintenance.">
                 <template #cell-number="{ row }"><span class="font-semibold text-gray-900 dark:text-white">{{ row.record.number }}</span><div class="text-xs text-gray-500">oleh {{ row.record.requested_by?.name ?? '-' }}</div></template>
-                <template #cell-asset="{ row }"><div class="font-medium text-gray-900 dark:text-white">{{ row.record.asset.number }}</div><div class="text-xs text-gray-500">{{ row.record.asset.product.name }} · {{ row.record.asset.product.code }}</div></template>
+                <template #cell-asset="{ row }"><div class="font-medium text-gray-900 dark:text-white">{{ row.record.asset?.number ?? 'Aset tidak tersedia' }}</div><div class="text-xs text-gray-500">{{ row.record.asset?.product?.name ?? 'Produk tidak tersedia' }}<template v-if="row.record.asset?.product?.code"> · {{ row.record.asset.product.code }}</template></div></template>
                 <template #cell-maintenance_type="{ row }"><span>{{ row.record.maintenance_type === 'PREVENTIVE' ? 'Preventive' : 'Corrective' }}</span><div class="text-xs text-gray-500">{{ row.record.execution_mode === 'INTERNAL' ? 'Tim Internal' : 'Vendor' }} · Prioritas {{ row.record.priority }}</div></template>
                 <template #cell-requested_at="{ row }">{{ date(row.record.requested_at) }}</template>
                 <template #cell-vendor="{ row }">{{ row.record.vendor?.name ?? 'Belum ditentukan' }}</template>
@@ -144,7 +144,7 @@ function completeMaintenance(): void {
 
         <Dialog v-model:visible="finishDialogVisible" modal header="Selesaikan Maintenance" :style="{ width: 'min(42rem, 94vw)' }">
             <form class="space-y-4" @submit.prevent="completeMaintenance">
-                <p class="text-sm text-gray-600 dark:text-gray-300">{{ finishRecord?.number }} · {{ finishRecord?.asset.number }} · {{ finishRecord?.asset.product.name }}</p>
+                <p class="text-sm text-gray-600 dark:text-gray-300">{{ finishRecord?.number }} · {{ finishRecord?.asset?.number ?? 'Aset tidak tersedia' }} · {{ finishRecord?.asset?.product?.name ?? 'Produk tidak tersedia' }}</p>
                 <label class="grid gap-1.5 text-sm font-medium text-gray-700 dark:text-gray-200">Ringkasan pekerjaan <span class="text-red-600">*</span><textarea v-model="finishForm.work_summary" rows="3" required maxlength="5000" class="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950" placeholder="Catat tindakan yang dilakukan dan hasilnya..." /><small v-if="finishForm.errors.work_summary" class="font-normal text-red-600">{{ finishForm.errors.work_summary }}</small></label>
                 <div class="grid gap-4 sm:grid-cols-2">
                     <label class="grid gap-1.5 text-sm font-medium text-gray-700 dark:text-gray-200">Kondisi aset setelah maintenance <span class="text-red-600">*</span><select v-model="finishForm.completed_condition" required class="h-11 rounded-lg border border-gray-300 bg-white px-3 text-sm dark:border-gray-700 dark:bg-gray-950"><option v-for="(label, value) in condition_options" :key="value" :value="value">{{ label }}</option></select><small v-if="finishForm.errors.completed_condition" class="font-normal text-red-600">{{ finishForm.errors.completed_condition }}</small></label>

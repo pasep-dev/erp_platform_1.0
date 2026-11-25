@@ -23,6 +23,7 @@ interface Category {
     id: string;
     code: string;
     name: string;
+    parent_id: string | null;
 }
 
 interface Type {
@@ -62,9 +63,15 @@ useMasterFieldFormatting(form);
 
 const filteredBrands = computed(() => {
     const selectedType = props.types.find((type) => type.id === form.type_id);
+    const categoryId = selectedType?.category_id;
+    const rootCategoryId = selectedType?.category?.parent_id ?? categoryId;
+
     return selectedType
         ? props.brands.filter((brand) =>
-              brand.categories.some((category) => category.id === selectedType.category_id),
+              brand.categories.some((category) =>
+                  category.id === categoryId
+                  || (category.parent_id === null && category.id === rootCategoryId),
+              ),
           )
         : [];
 });

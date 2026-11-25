@@ -22,7 +22,6 @@ interface Product {
     name: string;
     group: string;
     department_ids: string[];
-    branch_ids: string[];
 }
 
 interface Uom {
@@ -72,6 +71,14 @@ interface Branch {
     address: string | null;
 }
 
+interface Tax {
+    id: string;
+    code: string;
+    name: string;
+    rate: string | number;
+    category: "ADDITIVE" | "WITHHOLDING";
+}
+
 export interface PurchaseRequestItem {
     item_type: "PRODUCT" | "SERVICE";
     product_id: string | null;
@@ -90,6 +97,7 @@ export interface PurchaseRequestItem {
     remarks: string;
     requires_po: boolean;
     tax_included: boolean;
+    tax_id: string | null;
 }
 
 interface ExistingPurchaseRequestItem extends Omit<PurchaseRequestItem, "required_date"> {
@@ -126,6 +134,7 @@ const props = defineProps<{
     branches: Branch[];
     serviceTypes: ServiceType[];
     vendors: Vendor[];
+    taxes: Tax[];
     unitsOfMeasure: Uom[];
     requester: { id: number; name: string };
     company: { id: string; code: string; name: string } | null;
@@ -194,6 +203,7 @@ const items = ref<PurchaseRequestItem[]>(
         remarks: "Dibuat dari peringatan stok minimum",
         requires_po: true,
         tax_included: false,
+        tax_id: null,
     }]),
 );
 
@@ -222,7 +232,6 @@ const productOptions = computed(() =>
         label: `${product.code} - ${product.name}`,
         value: product.id,
         group: product.group,
-        branch_ids: product.branch_ids,
         name: product.name,
         code: product.code,
         })),
@@ -269,6 +278,13 @@ const vendorOptions = computed(() =>
         value: vendor.id,
     })),
 );
+
+const taxOptions = computed(() => props.taxes.map((tax) => ({
+    label: `${tax.code} - ${tax.name} (${Number(tax.rate)}%)${tax.category === "WITHHOLDING" ? " · Potong" : ""}`,
+    value: tax.id,
+    rate: Number(tax.rate),
+    category: tax.category,
+})));
 
 const companyOptions = computed(() =>
     props.companies.map((company) => ({
@@ -319,6 +335,7 @@ const emptyItem = (): PurchaseRequestItem => ({
     remarks: "",
     requires_po: false,
     tax_included: false,
+    tax_id: null,
 });
 
 const openAddItem = () => {
@@ -423,20 +440,23 @@ const itemSecondaryText = (item: PurchaseRequestItem) => {
 const itemAmount = (item: PurchaseRequestItem) =>
     Number(item.quantity || 0) * Number(item.estimated_unit_price || 0);
 
+const taxForItem = (item: PurchaseRequestItem) => props.taxes.find((tax) => tax.id === item.tax_id);
+const taxAmountForItem = (item: PurchaseRequestItem) => {
+    const tax = taxForItem(item);
+    const amount = itemAmount(item);
+    if (!tax || Number(tax.rate) <= 0) return 0;
+    if (tax.category === "WITHHOLDING") return Math.round(amount * Number(tax.rate) / 100);
+    return Math.round(item.tax_included ? amount * Number(tax.rate) / (100 + Number(tax.rate)) : amount * Number(tax.rate) / 100);
+};
+
 const subtotal = computed(() =>
     items.value.reduce((total, item) => total + itemAmount(item), 0),
 );
 
-const taxableSubtotal = computed(() =>
-    items.value.reduce(
-        (total, item) => total + (item.tax_included ? 0 : itemAmount(item)),
-        0,
-    ),
-);
-
-const tax = computed(() => Math.round(taxableSubtotal.value * 0.11));
-
-const grandTotal = computed(() => subtotal.value + tax.value);
+const additiveTax = computed(() => items.value.reduce((total, item) => total + (taxForItem(item)?.category === "ADDITIVE" ? taxAmountForItem(item) : 0), 0));
+const addedTax = computed(() => items.value.reduce((total, item) => total + (taxForItem(item)?.category === "ADDITIVE" && !item.tax_included ? taxAmountForItem(item) : 0), 0));
+const withholdingTax = computed(() => items.value.reduce((total, item) => total + (taxForItem(item)?.category === "WITHHOLDING" ? taxAmountForItem(item) : 0), 0));
+const grandTotal = computed(() => subtotal.value + addedTax.value - withholdingTax.value);
 
 /*
 |--------------------------------------------------------------------------
@@ -1030,12 +1050,17 @@ const cancel = () => {
 
                             <div class="flex items-center justify-between">
                                 <span class="text-gray-500">
-                                    Estimasi PPN 11%
+                                    Pajak (termasuk yang sudah di harga)
                                 </span>
 
                                 <span class="font-medium">
-                                    {{ formatCurrency(tax) }}
+                                    {{ formatCurrency(additiveTax) }}
                                 </span>
+                            </div>
+
+                            <div class="flex items-center justify-between">
+                                <span class="text-gray-500">Pajak potong</span>
+                                <span class="font-medium">−{{ formatCurrency(withholdingTax) }}</span>
                             </div>
 
                             <div
@@ -1193,6 +1218,7 @@ const cancel = () => {
         :service-type-options="serviceTypeOptions"
         :asset-options="assetOptions"
         :vendor-options="vendorOptions"
+        :tax-options="taxOptions"
                 :branch-options="branchOptions"
         @update:visible="drawerVisible = $event"
         @save="saveItem"

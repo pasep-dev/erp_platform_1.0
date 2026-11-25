@@ -11,6 +11,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class AssetTransferHistory extends Model
 {
+    protected $table = 'trx_asset_transfer_histories';
+
     use HasBranchAccessScope;
     use HasDepartmentAccessScope;
     use HasUlids;

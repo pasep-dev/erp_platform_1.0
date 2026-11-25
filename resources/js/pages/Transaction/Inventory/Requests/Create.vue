@@ -27,7 +27,6 @@ interface ProductOption {
     name: string;
     inventory_tracking_mode: string;
     department_ids: string[];
-    branch_ids: string[];
 }
 
 interface RequestItemForm {
@@ -44,7 +43,7 @@ const props = defineProps<{
     defaultDepartmentId: string | null;
 }>();
 
-const productOptions = computed(() => props.products.filter((product) => product.department_ids.includes(form.department_id) && product.branch_ids.includes(form.branch_id)).map((product) => ({
+const productOptions = computed(() => props.products.filter((product) => product.department_ids.includes(form.department_id)).map((product) => ({
     label: `${product.code} · ${product.name}${product.inventory_tracking_mode === "SERIAL" ? " · Serial" : ""}`,
     value: product.id,
 })));
@@ -73,7 +72,7 @@ watch(() => form.branch_id, () => {
 });
 
 watch(() => form.department_id, (departmentId) => {
-    const availableProducts = new Set(props.products.filter((product) => product.department_ids.includes(departmentId) && product.branch_ids.includes(form.branch_id)).map((product) => product.id));
+    const availableProducts = new Set(props.products.filter((product) => product.department_ids.includes(departmentId)).map((product) => product.id));
     form.items = form.items.map((item) => availableProducts.has(item.product_id) ? item : { ...item, product_id: "" });
 });
 

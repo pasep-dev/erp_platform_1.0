@@ -2,6 +2,7 @@
 
 namespace App\Services\Transaction\Inventory;
 
+use App\Enums\NumberingModuleCode;
 use App\Models\Master\Organization\Department;
 use App\Models\Master\Organization\Location;
 use App\Models\Master\Product\Product;
@@ -15,6 +16,7 @@ use App\Models\Transaction\Inventory\InventoryRequestItem;
 use App\Models\Transaction\Inventory\InventoryStockMovement;
 use App\Models\User;
 use App\Services\BranchAccessService;
+use App\Services\NumberingService;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -22,6 +24,8 @@ use Illuminate\Validation\ValidationException;
 
 class InventoryOperationService
 {
+    public function __construct(private readonly NumberingService $numberingService) {}
+
     /** @param array<string, mixed> $data */
     public function issue(Department $department, User $actor, array $data, ?InventoryRequest $inventoryRequest = null): InventoryDocument
     {
@@ -48,11 +52,10 @@ class InventoryOperationService
                 'source_location_id' => $location->id,
                 'occurred_at' => $data['occurred_at'],
                 'remarks' => $data['remarks'] ?? null,
-            ]);
+            ], $location);
 
             foreach ($items as $itemData) {
                 $product = $products->get($itemData['product_id']);
-                $this->assertProductBranch($product, $location);
                 $quantity = (float) $itemData['quantity'];
                 $requestItem = $inventoryRequest === null
                     ? null
@@ -122,12 +125,10 @@ class InventoryOperationService
                 'target_location_id' => $target->id,
                 'occurred_at' => $data['occurred_at'],
                 'remarks' => $data['remarks'] ?? null,
-            ]);
+            ], $source, $target);
 
             foreach ($items as $itemData) {
                 $product = $products->get($itemData['product_id']);
-                $this->assertProductBranch($product, $source);
-                $this->assertProductBranch($product, $target);
                 $quantity = (float) $itemData['quantity'];
                 $serials = $this->normalizeSerials($itemData['serial_numbers'] ?? []);
                 $this->assertQuantityAndSerials($product, $quantity, $serials);
@@ -163,11 +164,10 @@ class InventoryOperationService
                 'target_location_id' => $location->id,
                 'occurred_at' => $data['occurred_at'],
                 'remarks' => $data['remarks'] ?? null,
-            ]);
+            ], $location);
 
             foreach ($items as $itemData) {
                 $product = $products->get($itemData['product_id']);
-                $this->assertProductBranch($product, $location);
                 $quantity = (float) $itemData['quantity'];
                 $serials = $this->normalizeSerials($itemData['serial_numbers'] ?? []);
                 $this->assertQuantityAndSerials($product, $quantity, $serials);
@@ -208,11 +208,10 @@ class InventoryOperationService
                 'adjustment_direction' => $direction,
                 'occurred_at' => $data['occurred_at'],
                 'remarks' => $data['remarks'] ?? null,
-            ]);
+            ], $location);
 
             foreach ($items as $itemData) {
                 $product = $products->get($itemData['product_id']);
-                $this->assertProductBranch($product, $location);
                 $quantity = (float) $itemData['quantity'];
                 $serials = $this->normalizeSerials($itemData['serial_numbers'] ?? []);
                 $this->assertQuantityAndSerials($product, $quantity, $serials);
@@ -241,24 +240,77 @@ class InventoryOperationService
         });
     }
 
-    private function createDocument(Department $department, User $actor, string $type, array $attributes): InventoryDocument
-    {
+    private function createDocument(
+        Department $department,
+        User $actor,
+        string $type,
+        array $attributes,
+        Location $location,
+        ?Location $targetLocation = null,
+    ): InventoryDocument {
         $id = (string) Str::ulid();
-        $prefix = match ($type) {
-            InventoryDocument::TYPE_ISSUE => 'GI',
-            InventoryDocument::TYPE_TRANSFER => 'ST',
-            InventoryDocument::TYPE_RETURN => 'RT',
-            default => 'ADJ',
+        $moduleCode = match ($type) {
+            InventoryDocument::TYPE_ISSUE => NumberingModuleCode::InventoryIssue,
+            InventoryDocument::TYPE_RETURN => NumberingModuleCode::InventoryReturn,
+            InventoryDocument::TYPE_ADJUSTMENT => NumberingModuleCode::InventoryAdjustment,
+            default => null,
         };
+        $number = $moduleCode === null
+            ? 'ST-'.now()->format('Ymd').'-'.strtoupper(substr($id, -8))
+            : $this->numberingService->generate(
+                $moduleCode,
+                $this->numberingParameters($department, $location, $type, $attributes, $targetLocation),
+            );
 
         return InventoryDocument::query()->create(array_merge($attributes, [
             'id' => $id,
-            'number' => $prefix.'-'.now()->format('Ymd').'-'.strtoupper(substr($id, -8)),
+            'number' => $number,
             'department_id' => $department->id,
             'document_type' => $type,
             'status' => InventoryDocument::STATUS_POSTED,
             'performed_by' => $actor->id,
         ]));
+    }
+
+    /** @param array<string, mixed> $attributes
+     * @return array<string, string|null>
+     */
+    private function numberingParameters(
+        Department $department,
+        Location $location,
+        string $type,
+        array $attributes,
+        ?Location $targetLocation,
+    ): array {
+        $department->loadMissing('company:id,code');
+        $location->loadMissing(['company:id,code', 'branch:id,code']);
+        $targetLocation?->loadMissing(['company:id,code', 'branch:id,code']);
+        $direction = $attributes['adjustment_direction'] ?? match ($type) {
+            InventoryDocument::TYPE_ISSUE => 'OUT',
+            InventoryDocument::TYPE_RETURN => 'IN',
+            default => null,
+        };
+        $isSourceOperation = $type === InventoryDocument::TYPE_ISSUE
+            || ($type === InventoryDocument::TYPE_ADJUSTMENT && $direction === 'OUT');
+        $isTargetOperation = $type === InventoryDocument::TYPE_RETURN
+            || ($type === InventoryDocument::TYPE_ADJUSTMENT && $direction === 'IN');
+
+        return [
+            'company' => $department->company?->code,
+            'department' => $department->code,
+            'branch' => $location->branch?->code,
+            'location' => $location->code,
+            'source_company' => $isSourceOperation ? $location->company?->code : null,
+            'source_branch' => $isSourceOperation ? $location->branch?->code : null,
+            'source_department' => $isSourceOperation ? $department->code : null,
+            'source_location' => $isSourceOperation ? $location->code : null,
+            'target_company' => $isTargetOperation ? $location->company?->code : null,
+            'target_branch' => $isTargetOperation ? $location->branch?->code : null,
+            'target_department' => $isTargetOperation ? $department->code : null,
+            'target_location' => $isTargetOperation ? $location->code : null,
+            'document_type' => $type,
+            'direction' => $direction,
+        ];
     }
 
     /** @param array<string, mixed> $data */
@@ -440,13 +492,6 @@ class InventoryOperationService
         }
     }
 
-    private function assertProductBranch(Product $product, Location $location): void
-    {
-        if (! $product->branches()->whereKey($location->branch_id)->exists()) {
-            throw ValidationException::withMessages(['items' => 'Produk tidak tersedia pada branch gudang yang dipilih.']);
-        }
-    }
-
     /** @param array<string, mixed> $itemData */
     private function lockRequestItem(InventoryRequest $inventoryRequest, array $itemData, Product $product, float $quantity): InventoryRequestItem
     {
@@ -474,6 +519,15 @@ class InventoryOperationService
         User $actor,
     ): void {
         $asset = Asset::query()->lockForUpdate()->findOrFail($item->party_asset_id);
+        $asset->loadMissing([
+            'company:id,code',
+            'department:id,code',
+            'branch:id,code',
+            'location:id,code',
+            'type:id,code',
+            'category:id,code',
+            'product:id,code',
+        ]);
         $oldSpecifications = $asset->specifications ?? [];
         $changes = collect($item->specification_changes ?? [])
             ->mapWithKeys(fn (mixed $value, string|int $key): array => [trim((string) $key) => trim((string) $value)])
@@ -487,6 +541,20 @@ class InventoryOperationService
 
         AssetAssignmentHistory::query()->create([
             'asset_id' => $asset->id,
+            'number' => $this->numberingService->generate(
+                NumberingModuleCode::AssetAssignment,
+                [
+                    'company' => $asset->company?->code,
+                    'department' => $asset->department?->code,
+                    'branch' => $asset->branch?->code,
+                    'location' => $asset->location?->code,
+                    'asset_type' => $asset->type?->code,
+                    'category' => $asset->category?->code,
+                    'product' => $asset->product?->code,
+                    'document_type' => 'ASSET_ASSIGNMENT',
+                    'event_type' => $changes === [] ? 'CONSUMABLE_ISSUED' : 'UPGRADE',
+                ],
+            ),
             'event_type' => $changes === [] ? 'CONSUMABLE_ISSUED' : 'UPGRADE',
             'from_custodian_id' => $asset->custodian_id,
             'to_custodian_id' => $asset->custodian_id,

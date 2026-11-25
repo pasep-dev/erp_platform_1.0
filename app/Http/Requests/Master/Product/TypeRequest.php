@@ -26,24 +26,27 @@ class TypeRequest extends FormRequest
                 'required',
                 'string',
                 'size:26',
-                Rule::exists('mst_asset_categories', 'id')
+                Rule::exists('mst_product_categories', 'id')
+                    ->whereNotNull('parent_id')
                     ->where('is_active', true)
                     ->whereNull('deleted_at'),
             ],
 
-            'code' => [
-                'required',
-                'string',
-                'max:50',
-                'alpha_dash',
-                Rule::unique('mst_asset_types', 'code')
-                    ->ignore($typeId)
-                    ->where(
-                        'category_id',
-                        $this->input('category_id'),
-                    )
-                    ->whereNull('deleted_at'),
-            ],
+            'code' => $this->isMethod('POST')
+                ? ['prohibited']
+                : [
+                    'required',
+                    'string',
+                    'max:50',
+                    'alpha_dash',
+                    Rule::unique('mst_product_types', 'code')
+                        ->ignore($typeId)
+                        ->where(
+                            'category_id',
+                            $this->input('category_id'),
+                        )
+                        ->whereNull('deleted_at'),
+                ],
 
             'name' => [
                 'required',

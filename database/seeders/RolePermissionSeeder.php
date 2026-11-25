@@ -186,7 +186,19 @@ class RolePermissionSeeder extends Seeder
             Permission::where('guard_name', 'web')->get()
         );
 
-        $owner->syncPermissions(Permission::where('guard_name', 'web')->get());
+        $owner->syncPermissions(Permission::query()
+            ->where('guard_name', 'web')
+            ->whereIn('name', [
+                'dashboard.view',
+                'approval.view',
+                'purchase-request.view',
+                'purchase-order.view',
+                'good-receipt.view',
+                'registration.view',
+                'asset.view',
+                'consumable.view',
+            ])
+            ->get());
 
         /*
         |--------------------------------------------------------------------------

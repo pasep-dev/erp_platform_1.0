@@ -8,6 +8,7 @@ import ConfirmDialog from 'primevue/confirmdialog'
 import Tag from 'primevue/tag'
 import ProcurementPageHeader from '@/components/procurement/ProcurementPageHeader.vue'
 import { useConfirm } from 'primevue/useconfirm'
+import PrintDocumentHeader from '@/components/print/PrintDocumentHeader.vue'
 
 defineOptions({ layout: AppLayout })
 
@@ -154,22 +155,14 @@ function deleteReceipt() {
         <div class="print-document">
             <article class="gr-paper">
                 <div v-if="goodsReceipt.status === 'DRAFT'" class="gr-draft-watermark">DRAFT</div>
-                <header class="gr-document-header">
-                    <div class="gr-company">{{ goodsReceipt.company?.name ?? 'Citra Group' }}</div>
-                    <div class="gr-title">GOODS RECEIPT</div>
-                    <div class="gr-number">{{ goodsReceipt.number }}</div>
-                    <div class="gr-status" :class="goodsReceipt.status === 'DRAFT' ? 'gr-status-draft' : 'gr-status-posted'">{{ goodsReceipt.status === 'DRAFT' ? 'DRAFT — BELUM DIPOSTING' : 'POSTED / FINAL' }}</div>
-                </header>
+                <PrintDocumentHeader domain="procurement" title="Goods Receipt" :number="goodsReceipt.number" :company-name="goodsReceipt.company?.name ?? null" :date-label="`Tanggal diterima · ${date(goodsReceipt.received_at)}`" :status-label="goodsReceipt.status === 'DRAFT' ? 'Draft — belum diposting' : 'Posted / final'" />
 
                 <table class="gr-meta-table">
                     <tbody>
-                        <tr><th>Nomor GR</th><td>{{ goodsReceipt.number }}</td><th>Tanggal diterima</th><td>{{ date(goodsReceipt.received_at) }}</td></tr>
                         <tr><th>Jenis sumber</th><td>{{ sourceTypeLabel }}</td><th>Nomor sumber</th><td>{{ sourceNumber }}</td></tr>
                         <tr v-if="goodsReceipt.purchase_order?.purchase_request"><th>Purchase Request</th><td>{{ goodsReceipt.purchase_order.purchase_request.number }}</td><th>Nomor surat jalan</th><td>{{ goodsReceipt.delivery_note_number ?? '-' }}</td></tr>
                         <tr v-else><th>Nomor surat jalan</th><td>{{ goodsReceipt.delivery_note_number ?? '-' }}</td><th>Vendor</th><td>{{ goodsReceipt.vendor?.name ?? 'Tidak ditentukan di PR' }}</td></tr>
-                        <tr v-if="goodsReceipt.purchase_order?.purchase_request"><th>Vendor</th><td>{{ goodsReceipt.vendor?.name ?? 'Tidak ditentukan di PR' }}</td><th>Departemen</th><td>{{ goodsReceipt.department?.name ?? '-' }}</td></tr>
-                        <tr v-else><th>Perusahaan</th><td>{{ goodsReceipt.company?.name ?? '-' }}</td><th>Departemen</th><td>{{ goodsReceipt.department?.name ?? '-' }}</td></tr>
-                        <tr v-if="goodsReceipt.purchase_order?.purchase_request"><th>Perusahaan</th><td colspan="3">{{ goodsReceipt.company?.name ?? '-' }}</td></tr>
+                        <tr><th>Departemen</th><td>{{ goodsReceipt.department?.name ?? '-' }}</td><th>Vendor</th><td>{{ goodsReceipt.vendor?.name ?? 'Tidak ditentukan di PR' }}</td></tr>
                     </tbody>
                 </table>
 
@@ -291,11 +284,7 @@ function deleteReceipt() {
     .screen-only { display: none !important; }
     .print-document { display: block !important; }
     .gr-paper { position: relative; overflow: hidden; color: #171717; font: 9pt Arial, sans-serif; }
-    .gr-document-header { position: relative; z-index: 1; text-align: center; border-bottom: 1px solid #555; padding-bottom: 10pt; margin-bottom: 12pt; }
-    .gr-company { font-size: 10pt; font-weight: bold; letter-spacing: .08em; text-transform: uppercase; }
-    .gr-title { margin-top: 8pt; font-size: 17pt; font-weight: bold; letter-spacing: .08em; }
-    .gr-number { margin-top: 3pt; font-size: 10pt; font-weight: bold; }
-    .gr-status { margin-top: 5pt; font-size: 8pt; font-weight: bold; }
+    .gr-paper :deep(.print-document-header) { position: relative; z-index: 1; margin-bottom: 12pt; }
     .gr-status-draft { color: #a16207; }
     .gr-status-posted { color: #166534; }
     .gr-draft-watermark { position: fixed; z-index: 0; top: 42%; left: 20%; color: rgba(120, 53, 15, .12); font-size: 70pt; font-weight: bold; transform: rotate(-32deg); }
@@ -305,7 +294,7 @@ function deleteReceipt() {
     .gr-meta-table th { width: 16%; background: #f0f0f0; text-align: left; }
     .gr-meta-table td { width: 34%; }
     .gr-items-table { font-size: 7.5pt; }
-    .gr-items-table thead { display: table-header-group; background: #eee; }
+    .gr-items-table thead { display: table-header-group; background: #dbeafe; color: #1e3a8a; }
     .gr-items-table th { text-align: left; }
     .gr-items-table th:nth-child(1) { width: 5%; }
     .gr-items-table th:nth-child(2) { width: 28%; }

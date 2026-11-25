@@ -32,6 +32,11 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'vendor_url',
     'requires_po',
     'tax_included',
+    'tax_id',
+    'tax_code',
+    'tax_name',
+    'tax_rate',
+    'tax_category',
     'required_date',
     'delivery_address',
     'remarks',
@@ -43,7 +48,7 @@ class PurchaseRequestItem extends Model
     use HasFactory;
     use HasUlids;
 
-    protected $table = 'purchase_request_items';
+    protected $table = 'trx_purchase_request_items';
 
     protected $fillable = [
         'purchase_request_id',
@@ -62,6 +67,11 @@ class PurchaseRequestItem extends Model
         'vendor_url',
         'requires_po',
         'tax_included',
+        'tax_id',
+        'tax_code',
+        'tax_name',
+        'tax_rate',
+        'tax_category',
         'required_date',
         'delivery_address',
         'remarks',
@@ -74,6 +84,7 @@ class PurchaseRequestItem extends Model
             'estimated_unit_price' => 'decimal:2',
             'requires_po' => 'boolean',
             'tax_included' => 'boolean',
+            'tax_rate' => 'decimal:4',
             'required_date' => 'date:Y-m-d',
         ];
     }

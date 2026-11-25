@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Transaction\Inventory;
 
+use App\Enums\NumberingModuleCode;
 use App\Http\Controllers\Controller;
 use App\Models\Master\Organization\Branch;
 use App\Models\Master\Organization\Department;
@@ -15,6 +16,7 @@ use App\Services\ActivityLogger;
 use App\Services\Administrator\Workflow\ApprovalService;
 use App\Services\BranchAccessService;
 use App\Services\DepartmentAccessService;
+use App\Services\NumberingService;
 use App\Services\Transaction\Inventory\InventoryOperationService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
@@ -35,6 +37,7 @@ class InventoryRequestController extends Controller
         private readonly ActivityLogger $activityLogger,
         private readonly DepartmentAccessService $departmentAccess,
         private readonly BranchAccessService $branchAccess,
+        private readonly NumberingService $numberingService,
     ) {}
 
     public function index(Request $request): Response
@@ -68,7 +71,7 @@ class InventoryRequestController extends Controller
                 ->where('group', 'CONSUMABLE')
                 ->where('is_active', true)
                 ->orderBy('name')
-                ->with(['departments:id', 'branches:id'])
+                ->with('departments:id')
                 ->get(['id', 'code', 'name', 'inventory_tracking_mode'])
                 ->map(fn (Product $product): array => [
                     'id' => $product->id,
@@ -76,7 +79,6 @@ class InventoryRequestController extends Controller
                     'name' => $product->name,
                     'inventory_tracking_mode' => $product->inventory_tracking_mode,
                     'department_ids' => $product->departments->pluck('id')->all(),
-                    'branch_ids' => $product->branches->pluck('id')->all(),
                 ]),
             'defaultBranchId' => $user->hasGlobalBranchAccess() ? null : $user->branch_id,
             'defaultDepartmentId' => $user->hasGlobalDepartmentAccess() ? null : $user->department_id,
@@ -95,7 +97,7 @@ class InventoryRequestController extends Controller
             'required_at' => ['nullable', 'date', 'after_or_equal:requested_at'],
             'remarks' => ['nullable', 'string', 'max:2000'],
             'items' => ['required', 'array', 'min:1', 'max:100'],
-            'items.*.product_id' => ['required', 'string', 'size:26', Rule::exists('mst_products', 'id')->where('group', 'CONSUMABLE')->where('is_active', true)->whereNull('deleted_at'), Rule::exists('product_department', 'product_id')->where('department_id', $request->input('department_id')), Rule::exists('product_branch', 'product_id')->where('branch_id', $request->input('branch_id'))],
+            'items.*.product_id' => ['required', 'string', 'size:26', Rule::exists('mst_products', 'id')->where('group', 'CONSUMABLE')->where('is_active', true)->whereNull('deleted_at'), Rule::exists('mst_product_departments', 'product_id')->where('department_id', $request->input('department_id'))],
             'items.*.requested_quantity' => ['required', 'numeric', 'gt:0', 'decimal:0,3'],
             'items.*.remarks' => ['nullable', 'string', 'max:1000'],
         ]);
@@ -103,13 +105,22 @@ class InventoryRequestController extends Controller
         $department = $this->authorizedDepartment($user, $validated['department_id']);
         $branch = Branch::query()->findOrFail($validated['branch_id']);
         abort_unless($branch->company_id === $department->company_id, 422, 'Department and branch must belong to the same company.');
+        $department->loadMissing('company:id,code');
         $products = Product::query()->whereIn('id', collect($validated['items'])->pluck('product_id'))->get()->keyBy('id');
 
         $id = (string) Str::ulid();
         $inventoryRequest = DB::transaction(function () use ($id, $validated, $department, $branch, $user, $products): InventoryRequest {
             $inventoryRequest = InventoryRequest::query()->create([
                 'id' => $id,
-                'number' => 'IR-'.now()->format('Ymd').'-'.strtoupper(substr($id, -8)),
+                'number' => $this->numberingService->generate(
+                    NumberingModuleCode::InventoryRequest,
+                    [
+                        'company' => $department->company?->code,
+                        'department' => $department->code,
+                        'branch' => $branch->code,
+                        'document_type' => 'INVENTORY_REQUEST',
+                    ],
+                ),
                 'department_id' => $department->id,
                 'branch_id' => $branch->id,
                 'requested_by' => $user->id,
@@ -272,18 +283,18 @@ class InventoryRequestController extends Controller
         abort_unless($this->canAccessDepartment($user, $inventoryRequest->department), 404);
 
         $validated = $request->validate([
-            'source_location_id' => ['required', 'string', 'size:26', Rule::exists('inventory_department_warehouses', 'location_id')->where('department_id', $inventoryRequest->department_id)],
+            'source_location_id' => ['required', 'string', 'size:26', Rule::exists('trx_inventory_department_warehouses', 'location_id')->where('department_id', $inventoryRequest->department_id)],
             'occurred_at' => ['required', 'date'],
             'remarks' => ['nullable', 'string', 'max:2000'],
             'items' => ['required', 'array', 'min:1', 'max:100'],
-            'items.*.inventory_request_item_id' => ['required', 'string', 'size:26', Rule::exists('inventory_request_items', 'id')->where('inventory_request_id', $inventoryRequest->id)],
-            'items.*.product_id' => ['required', 'string', 'size:26', Rule::exists('mst_products', 'id')->where('group', 'CONSUMABLE')->where('is_active', true)->whereNull('deleted_at'), Rule::exists('product_department', 'product_id')->where('department_id', $inventoryRequest->department_id)],
+            'items.*.inventory_request_item_id' => ['required', 'string', 'size:26', Rule::exists('trx_inventory_request_items', 'id')->where('inventory_request_id', $inventoryRequest->id)],
+            'items.*.product_id' => ['required', 'string', 'size:26', Rule::exists('mst_products', 'id')->where('group', 'CONSUMABLE')->where('is_active', true)->whereNull('deleted_at'), Rule::exists('mst_product_departments', 'product_id')->where('department_id', $inventoryRequest->department_id)],
             'items.*.quantity' => ['required', 'numeric', 'gt:0', 'decimal:0,3'],
             'items.*.serial_numbers' => ['nullable', 'array', 'max:500'],
             'items.*.serial_numbers.*' => ['required', 'string', 'max:150'],
             'items.*.party_type' => ['required', Rule::in(['USER', 'ASSET', 'LOCATION'])],
             'items.*.party_user_id' => ['nullable', 'integer', Rule::exists('users', 'id')],
-            'items.*.party_asset_id' => ['nullable', 'string', 'size:26', Rule::exists('assets', 'id')],
+            'items.*.party_asset_id' => ['nullable', 'string', 'size:26', Rule::exists('trx_assets', 'id')],
             'items.*.party_location_id' => ['nullable', 'string', 'size:26', Rule::exists('mst_org_locations', 'id')],
             'items.*.specification_changes' => ['nullable', 'array', 'max:30'],
             'items.*.specification_changes.*' => ['nullable', 'string', 'max:150'],

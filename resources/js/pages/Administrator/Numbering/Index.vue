@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { router, useForm } from "@inertiajs/vue3";
-import { ref } from "vue";
+import { computed, ref } from "vue";
 import { route } from "ziggy-js";
 import { Info } from "lucide-vue-next";
 
@@ -33,6 +33,7 @@ interface NumberingModule {
     code: string;
     name: string;
     category: string;
+    placeholders?: string[];
 }
 
 interface PaginatedDocuments {
@@ -92,6 +93,10 @@ const form = useForm({
     is_active: true,
 });
 
+const activePlaceholders = computed(() =>
+    props.modules[form.code]?.placeholders ?? props.placeholders,
+);
+
 const inputClass =
     "h-11 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-900 outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-500/15 dark:border-gray-700 dark:bg-gray-950 dark:text-white";
 const labelClass =
@@ -113,6 +118,20 @@ function handleModuleChange(): void {
     }
 
     form.name = module.name;
+}
+
+function appendPlaceholder(placeholder: string): void {
+    const token = formatPlaceholder(placeholder);
+
+    if (form.pattern.includes(token)) {
+        return;
+    }
+
+    const separator = form.pattern.length > 0 && !/[\-_/]$/.test(form.pattern)
+        ? "-"
+        : "";
+
+    form.pattern = `${form.pattern}${separator}${token}`;
 }
 
 function openEditForm(document: NumberingDocument): void {
@@ -330,7 +349,7 @@ function formatPlaceholder(placeholder: string): string {
             </h2>
             <div class="mt-3 flex flex-wrap gap-2">
                 <code
-                    v-for="placeholder in placeholders"
+                    v-for="placeholder in activePlaceholders"
                     :key="placeholder"
                     class="rounded-md border border-blue-100 bg-white px-2 py-1 text-xs text-blue-800 dark:border-blue-900 dark:bg-blue-950 dark:text-blue-200"
                 >
@@ -380,7 +399,7 @@ function formatPlaceholder(placeholder: string): string {
                         </option>
                     </select>
                     <p class="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
-                        Pilih modul aktif yang sudah didaftarkan pada Settings. Kode dokumen akan mengikuti kode modul.
+                        Pilih modul aplikasi yang sudah terhubung. Kode dokumen akan mengikuti identitas modul tersebut.
                     </p>
                     <p v-if="form.errors.code" :class="errorClass">
                         {{ form.errors.code }}
@@ -423,6 +442,17 @@ function formatPlaceholder(placeholder: string): string {
                     <label for="numbering-pattern" :class="labelClass">
                         Format Nomor
                     </label>
+                    <div class="mb-2 flex flex-wrap gap-2">
+                        <button
+                            v-for="placeholder in activePlaceholders"
+                            :key="placeholder"
+                            type="button"
+                            class="rounded-md border border-blue-200 bg-blue-50 px-2 py-1 text-xs text-blue-800 transition hover:bg-blue-100 dark:border-blue-900 dark:bg-blue-950 dark:text-blue-200 dark:hover:bg-blue-900"
+                            @click="appendPlaceholder(placeholder)"
+                        >
+                            + {{ formatPlaceholder(placeholder) }}
+                        </button>
+                    </div>
                     <input
                         id="numbering-pattern"
                         v-model="form.pattern"

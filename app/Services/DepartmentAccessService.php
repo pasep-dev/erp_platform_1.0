@@ -20,8 +20,10 @@ class DepartmentAccessService
             return Department::query()->pluck('id')->all();
         }
 
+        $user->loadMissing('additionalDepartments:id');
+
         return collect([$user->department_id])
-            ->merge($user->additionalDepartments()->pluck('mst_org_departments.id'))
+            ->merge($user->additionalDepartments->modelKeys())
             ->filter()
             ->unique()
             ->values()

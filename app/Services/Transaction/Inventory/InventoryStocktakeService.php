@@ -2,6 +2,7 @@
 
 namespace App\Services\Transaction\Inventory;
 
+use App\Enums\NumberingModuleCode;
 use App\Models\Master\Organization\Department;
 use App\Models\Master\Organization\Location;
 use App\Models\Master\Product\Product;
@@ -11,6 +12,7 @@ use App\Models\Transaction\Inventory\InventoryStocktake;
 use App\Models\Transaction\Inventory\InventoryStocktakeItem;
 use App\Models\User;
 use App\Services\ActivityLogger;
+use App\Services\NumberingService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -20,12 +22,15 @@ class InventoryStocktakeService
     public function __construct(
         private readonly InventoryOperationService $inventoryOperationService,
         private readonly ActivityLogger $activityLogger,
+        private readonly NumberingService $numberingService,
     ) {}
 
     public function createSnapshot(Department $department, Location $location, User $actor, ?string $remarks): InventoryStocktake
     {
         return DB::transaction(function () use ($department, $location, $actor, $remarks): InventoryStocktake {
             $this->lockMappedWarehouse($department, $location);
+            $department->loadMissing('company:id,code');
+            $location->loadMissing(['company:id,code', 'branch:id,code']);
             $products = Product::query()
                 ->where('group', 'CONSUMABLE')
                 ->where('is_active', true)
@@ -40,7 +45,16 @@ class InventoryStocktakeService
             $id = (string) Str::ulid();
             $stocktake = InventoryStocktake::query()->create([
                 'id' => $id,
-                'number' => 'SO-'.now()->format('Ymd').'-'.strtoupper(substr($id, -8)),
+                'number' => $this->numberingService->generate(
+                    NumberingModuleCode::InventoryStocktake,
+                    [
+                        'company' => $department->company?->code,
+                        'department' => $department->code,
+                        'branch' => $location->branch?->code,
+                        'location' => $location->code,
+                        'document_type' => 'INVENTORY_STOCKTAKE',
+                    ],
+                ),
                 'department_id' => $department->id,
                 'location_id' => $location->id,
                 'initiated_by' => $actor->id,

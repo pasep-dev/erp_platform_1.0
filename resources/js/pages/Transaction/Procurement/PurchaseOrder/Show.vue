@@ -10,6 +10,7 @@ import Tag from 'primevue/tag'
 import Textarea from 'primevue/textarea'
 import { useConfirm } from 'primevue/useconfirm'
 import ProcurementPageHeader from '@/components/procurement/ProcurementPageHeader.vue'
+import PrintDocumentHeader from '@/components/print/PrintDocumentHeader.vue'
 
 defineOptions({ layout: AppLayout })
 
@@ -28,6 +29,10 @@ interface PurchaseOrderItem {
     pr_estimated_unit_price: string | number | null
     unit_price: string | number | null
     tax_included: boolean
+    tax_code?: string | null
+    tax_name?: string | null
+    tax_rate?: string | number | null
+    tax_category?: 'ADDITIVE' | 'WITHHOLDING' | null
     product?: { code: string; name: string } | null
     service_type?: { code: string; name: string } | null
     asset_id?: string | null
@@ -57,7 +62,18 @@ const cancelDialog = ref(false)
 const cancelReason = ref('')
 const processingCancel = ref(false)
 
-const total = computed(() => props.purchaseOrder.items.reduce((sum, item) => sum + Number(item.quantity) * Number(item.unit_price ?? 0), 0))
+const lineAmount = (item: PurchaseOrderItem) => Number(item.quantity) * Number(item.unit_price ?? 0)
+const lineTax = (item: PurchaseOrderItem) => {
+    const rate = Number(item.tax_rate ?? 0)
+    if (rate <= 0) return 0
+    const amount = lineAmount(item)
+    if (item.tax_category === 'WITHHOLDING') return Math.round(amount * rate / 100)
+    return Math.round(item.tax_included ? amount * rate / (100 + rate) : amount * rate / 100)
+}
+const lineTotal = (item: PurchaseOrderItem) => lineAmount(item) + (item.tax_category === 'ADDITIVE' && !item.tax_included ? lineTax(item) : 0) - (item.tax_category === 'WITHHOLDING' ? lineTax(item) : 0)
+const total = computed(() => props.purchaseOrder.items.reduce((sum, item) => sum + lineTotal(item), 0))
+const addedTax = computed(() => props.purchaseOrder.items.reduce((sum, item) => sum + (item.tax_category === 'ADDITIVE' && !item.tax_included ? lineTax(item) : 0), 0))
+const withholdingTotal = computed(() => props.purchaseOrder.items.reduce((sum, item) => sum + (item.tax_category === 'WITHHOLDING' ? lineTax(item) : 0), 0))
 const printMode = ref(false)
 let closeTabAfterPrint = false
 const money = (value: number | string | null) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 2 }).format(Number(value ?? 0))
@@ -144,7 +160,7 @@ function cancelOrder() {
             :description="`Pesanan dari Purchase Request ${purchaseOrder.purchase_request?.number ?? '-'}.`"
         >
             <template #badge>
-                <Tag :value="statusLabel(purchaseOrder.status)" :severity="severity(purchaseOrder.status)" />
+                <Tag :value="statusLabel(purchaseOrder.status)" :severity="statusSeverity(purchaseOrder.status)" />
             </template>
             <template #actions>
             <div class="flex flex-wrap gap-2">
@@ -198,11 +214,11 @@ function cancelOrder() {
                             <thead class="bg-gray-50 text-gray-600 dark:bg-white/[0.03] dark:text-gray-300"><tr><th class="px-5 py-3 font-semibold">Barang / Jasa</th><th class="px-5 py-3 text-right font-semibold">Kuantitas</th><th class="px-5 py-3 text-right font-semibold">Estimasi PR</th><th class="px-5 py-3 text-right font-semibold">Harga PO</th><th class="px-5 py-3 text-right font-semibold">Jumlah</th></tr></thead>
                             <tbody class="divide-y divide-gray-200 dark:divide-gray-800">
                                 <tr v-for="(item, index) in purchaseOrder.items" :key="item.id">
-                                    <td class="px-5 py-4 align-top"><div class="font-semibold text-gray-900 dark:text-white">{{ item.product?.name ?? item.service_type?.name ?? item.description ?? 'Item' }}</div><div class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ item.product?.code ?? item.service_type?.code ?? item.description ?? `Item ${index + 1}` }}<span v-if="item.asset_id"> · Asset {{ item.asset_id }}</span></div><div v-if="item.description && item.description !== item.product?.name && item.description !== item.service_type?.name" class="mt-2 text-gray-600 dark:text-gray-300">{{ item.description }}</div><div class="mt-1 text-xs text-gray-500">Unit: {{ item.uom?.name ?? item.uom?.code ?? '-' }}</div></td>
+                                    <td class="px-5 py-4 align-top"><div class="font-semibold text-gray-900 dark:text-white">{{ item.product?.name ?? item.service_type?.name ?? item.description ?? 'Item' }}</div><div class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ item.product?.code ?? item.service_type?.code ?? item.description ?? `Item ${index + 1}` }}<span v-if="item.asset_id"> · Asset {{ item.asset_id }}</span></div><div v-if="item.description && item.description !== item.product?.name && item.description !== item.service_type?.name" class="mt-2 text-gray-600 dark:text-gray-300">{{ item.description }}</div><div class="mt-1 text-xs text-gray-500">Unit: {{ item.uom?.name ?? item.uom?.code ?? '-' }}</div><div v-if="item.tax_name" class="mt-1 text-xs text-blue-700 dark:text-blue-400">{{ item.tax_code }} {{ item.tax_name }} · {{ Number(item.tax_rate) }}%{{ item.tax_included ? ' · termasuk harga' : '' }}</div></td>
                                     <td class="whitespace-nowrap px-5 py-4 text-right align-top tabular-nums">{{ Number(item.quantity).toLocaleString('id-ID') }} <span class="text-gray-500">{{ item.uom?.code ?? '' }}</span></td>
                                     <td class="whitespace-nowrap px-5 py-4 text-right align-top tabular-nums text-gray-600 dark:text-gray-300">{{ item.pr_estimated_unit_price === null ? 'Belum diestimasi' : money(item.pr_estimated_unit_price) }}</td>
                                     <td class="whitespace-nowrap px-5 py-4 text-right align-top font-medium tabular-nums text-gray-900 dark:text-white">{{ item.unit_price === null ? 'Belum diisi' : money(item.unit_price) }}</td>
-                                    <td class="whitespace-nowrap px-5 py-4 text-right align-top font-semibold tabular-nums text-gray-900 dark:text-white">{{ money(Number(item.quantity) * Number(item.unit_price ?? 0)) }}</td>
+                                    <td class="whitespace-nowrap px-5 py-4 text-right align-top font-semibold tabular-nums text-gray-900 dark:text-white">{{ money(lineTotal(item)) }}</td>
                                 </tr>
                                 <tr v-if="purchaseOrder.items.length === 0"><td colspan="5" class="px-5 py-10 text-center text-gray-500">Belum ada item pada Purchase Order.</td></tr>
                             </tbody>
@@ -235,15 +251,16 @@ function cancelOrder() {
                 <section class="rounded-xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-900">
                     <h2 class="font-semibold text-gray-900 dark:text-white">Ringkasan Nilai</h2>
                     <div class="mt-4 flex items-center justify-between gap-3 text-sm text-gray-600 dark:text-gray-300"><span>Total item</span><span>{{ purchaseOrder.items.length }}</span></div>
+                    <div class="mt-3 flex items-center justify-between gap-3 text-sm text-gray-600 dark:text-gray-300"><span>Pajak menambah</span><span>{{ money(addedTax) }}</span></div>
+                    <div class="mt-3 flex items-center justify-between gap-3 text-sm text-gray-600 dark:text-gray-300"><span>Pajak potong</span><span>−{{ money(withholdingTotal) }}</span></div>
                     <div class="mt-3 flex items-start justify-between gap-3 border-t border-gray-200 pt-3 dark:border-gray-800"><span class="text-sm font-medium text-gray-700 dark:text-gray-200">Total PO</span><strong class="text-right text-lg tabular-nums text-gray-900 dark:text-white">{{ money(total) }}</strong></div>
                 </section>
             </aside>
         </div>
 
         <section class="po-paper print-document rounded-xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-900">
-            <div class="po-heading border-b border-gray-200 pb-4 text-center dark:border-gray-700">
-                <h2 class="text-lg font-bold tracking-wide">PURCHASE ORDER</h2>
-                <p class="mt-1 text-sm font-semibold">{{ purchaseOrder.number }}</p>
+            <div class="po-heading">
+                <PrintDocumentHeader domain="procurement" title="Purchase Order" :number="purchaseOrder.number" :company-name="purchaseOrder.company?.name ?? null" :date-label="`Tanggal PO · ${date(purchaseOrder.created_at)}`" />
                 <Tag class="screen-only mt-3" :value="statusLabel(purchaseOrder.status)" :severity="statusSeverity(purchaseOrder.status)" />
             </div>
 
@@ -251,11 +268,9 @@ function cancelOrder() {
                 <div class="space-y-2 text-sm">
                     <div><span class="text-gray-500">Purchase Request:</span> <strong>{{ purchaseOrder.purchase_request?.number }}</strong></div>
                     <div><span class="text-gray-500">Tanggal PR:</span> {{ date(purchaseOrder.purchase_request?.request_date) }}</div>
-                    <div><span class="text-gray-500">Perusahaan:</span> {{ purchaseOrder.company?.name }}</div>
                     <div><span class="text-gray-500">Department:</span> {{ purchaseOrder.department?.name }}</div>
                 </div>
                 <div class="space-y-2 text-sm">
-                    <div><span class="text-gray-500">Tanggal PO:</span> {{ date(purchaseOrder.created_at) }}</div>
                     <div><span class="text-gray-500">Vendor:</span> <strong>{{ purchaseOrder.vendor?.name }}</strong></div>
                     <div><span class="text-gray-500">Kontak:</span> {{ purchaseOrder.vendor?.phone ?? '-' }} · {{ purchaseOrder.vendor?.email ?? '-' }}</div>
                     <div><span class="text-gray-500">Alamat:</span> {{ purchaseOrder.vendor?.address ?? '-' }}</div>
@@ -276,16 +291,16 @@ function cancelOrder() {
                         <col class="po-column-price" />
                         <col class="po-column-total" />
                     </colgroup>
-                    <thead><tr class="bg-purple-950 text-left text-white"><th class="p-3">No.</th><th class="p-3">Deskripsi</th><th class="p-3 text-right">Qty</th><th class="p-3">Unit</th><th class="p-3 text-right">Estimasi PR</th><th class="p-3 text-right">Harga PO</th><th class="p-3 text-right">Jumlah</th></tr></thead>
+                    <thead><tr class="bg-blue-950 text-left text-white"><th class="p-3">No.</th><th class="p-3">Deskripsi</th><th class="p-3 text-right">Qty</th><th class="p-3">Unit</th><th class="p-3 text-right">Estimasi PR</th><th class="p-3 text-right">Harga PO</th><th class="p-3 text-right">Jumlah</th></tr></thead>
                     <tbody>
                         <tr v-for="(item, index) in purchaseOrder.items" :key="item.id" class="border-b border-gray-200 dark:border-gray-700">
                             <td class="p-3 align-top">{{ index + 1 }}</td>
-                            <td class="p-3 align-top"><div class="font-medium">{{ item.product?.name ?? item.service_type?.name ?? item.description ?? 'Item' }}</div><div class="text-xs text-gray-500">{{ item.product?.code ?? item.service_type?.code ?? item.description }}<span v-if="item.asset_id"> · Asset {{ item.asset_id }}</span></div><div v-if="item.price_histories.length" class="mt-2 text-xs text-gray-500 screen-only">{{ item.price_histories.length }} perubahan harga tercatat</div></td>
+                            <td class="p-3 align-top"><div class="font-medium">{{ item.product?.name ?? item.service_type?.name ?? item.description ?? 'Item' }}</div><div class="text-xs text-gray-500">{{ item.product?.code ?? item.service_type?.code ?? item.description }}<span v-if="item.asset_id"> · Asset {{ item.asset_id }}</span></div><div v-if="item.tax_name" class="text-xs text-gray-500">{{ item.tax_code }} {{ item.tax_name }} {{ Number(item.tax_rate) }}%{{ item.tax_included ? ' (termasuk)' : '' }}</div><div v-if="item.price_histories.length" class="mt-2 text-xs text-gray-500 screen-only">{{ item.price_histories.length }} perubahan harga tercatat</div></td>
                             <td class="p-3 text-right align-top">{{ Number(item.quantity).toLocaleString('id-ID') }}</td>
                             <td class="p-3 align-top">{{ item.uom?.code ?? '-' }}</td>
                             <td class="p-3 text-right align-top">{{ item.pr_estimated_unit_price === null ? 'Belum diestimasi' : money(item.pr_estimated_unit_price) }}</td>
                             <td class="p-3 text-right align-top">{{ item.unit_price === null ? 'Belum diisi' : money(item.unit_price) }}</td>
-                            <td class="p-3 text-right align-top">{{ money(Number(item.quantity) * Number(item.unit_price ?? 0)) }}</td>
+                            <td class="p-3 text-right align-top">{{ money(lineTotal(item)) }}</td>
                         </tr>
                     </tbody>
                     <tfoot><tr class="font-bold"><td colspan="6" class="p-3 text-right">TOTAL PO</td><td class="p-3 text-right">{{ money(total) }}</td></tr></tfoot>

@@ -80,7 +80,7 @@ const form = useForm({
 
 const isEditing = computed(() => Boolean(props.goodsReceipt))
 const availableWarehouses = computed(() =>
-    props.warehouses.filter((warehouse) => warehouse.branch_id === selectedBranchId.value),
+    props.warehouses.filter((warehouse) => !selectedBranchId.value || warehouse.branch_id === selectedBranchId.value),
 )
 const availableStorageLocations = computed(() =>
     props.storageLocations.filter((location) => location.parent_id === form.warehouse_location_id),
@@ -182,18 +182,19 @@ function save() {
             </div>
             <div class="grid gap-4 sm:grid-cols-2">
                 <div>
-                    <label for="receipt-branch" class="mb-1 block text-sm font-medium">Cabang <span class="text-red-600">*</span></label>
-                    <select id="receipt-branch" v-model="selectedBranchId" class="h-11 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm dark:border-gray-700 dark:bg-gray-950 dark:text-white" required>
-                        <option value="" disabled>Pilih cabang</option>
+                    <label for="receipt-branch" class="mb-1 block text-sm font-medium">Cabang gudang <span class="text-gray-400">(opsional)</span></label>
+                    <select id="receipt-branch" v-model="selectedBranchId" class="h-11 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm dark:border-gray-700 dark:bg-gray-950 dark:text-white">
+                        <option value="">Semua cabang</option>
                         <option v-for="branch in branches" :key="branch.id" :value="branch.id">{{ branch.code }} · {{ branch.name }}</option>
                     </select>
                 </div>
                 <div>
-                    <label for="receipt-warehouse" class="mb-1 block text-sm font-medium">Gudang <span class="text-red-600">*</span></label>
-                    <select id="receipt-warehouse" v-model="form.warehouse_location_id" class="h-11 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm dark:border-gray-700 dark:bg-gray-950 dark:text-white" :disabled="!selectedBranchId" required>
-                        <option value="" disabled>Pilih gudang</option>
+                    <label for="receipt-warehouse" class="mb-1 block text-sm font-medium">Gudang tujuan <span class="text-gray-400">(opsional)</span></label>
+                    <select id="receipt-warehouse" v-model="form.warehouse_location_id" class="h-11 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm dark:border-gray-700 dark:bg-gray-950 dark:text-white">
+                        <option value="">Belum ditentukan</option>
                         <option v-for="warehouse in availableWarehouses" :key="warehouse.id" :value="warehouse.id">{{ warehouse.code }} · {{ warehouse.name }}</option>
                     </select>
+                    <small class="text-gray-500 dark:text-gray-400">Pilih gudang agar stok consumable tercatat otomatis. Jika belum diketahui, penerimaan dapat diposting dan dipetakan ke gudang kemudian.</small>
                     <small v-if="form.errors.warehouse_location_id" class="text-red-600">{{ form.errors.warehouse_location_id }}</small>
                 </div>
                 <div>

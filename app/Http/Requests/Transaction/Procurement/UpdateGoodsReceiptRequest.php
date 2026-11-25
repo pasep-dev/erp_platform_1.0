@@ -18,7 +18,7 @@ class UpdateGoodsReceiptRequest extends FormRequest
     {
         return [
             'received_at' => ['required', 'date'],
-            'warehouse_location_id' => ['required', 'string', 'size:26', 'exists:mst_org_locations,id'],
+            'warehouse_location_id' => ['nullable', 'string', 'size:26', 'exists:mst_org_locations,id'],
             'storage_location_id' => ['nullable', 'string', 'size:26', 'exists:mst_org_locations,id'],
             'delivery_note_number' => ['nullable', 'string', 'max:100'],
             'remarks' => ['nullable', 'string', 'max:5000'],

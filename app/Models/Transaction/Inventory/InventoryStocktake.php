@@ -24,7 +24,7 @@ class InventoryStocktake extends Model
 
     public const STATUS_POSTED = 'POSTED';
 
-    protected $table = 'inventory_stocktakes';
+    protected $table = 'trx_inventory_stocktakes';
 
     protected $fillable = ['number', 'department_id', 'location_id', 'initiated_by', 'status', 'counted_at', 'posted_at', 'remarks'];
 

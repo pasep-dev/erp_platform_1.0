@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Transaction\Procurement;
 
 use App\Enums\Administrator\Workflow\ApprovalStatus;
+use App\Enums\NumberingModuleCode;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Transaction\Procurement\MarkPurchaseRequestApprovedRequest;
 use App\Http\Requests\Transaction\Procurement\PurchaseRequestRequest;
@@ -13,10 +14,10 @@ use App\Models\Master\Organization\Branch;
 use App\Models\Master\Organization\Company;
 use App\Models\Master\Organization\Department;
 use App\Models\Master\Procurement\ServiceType;
+use App\Models\Master\Procurement\Tax;
 use App\Models\Master\Procurement\UnitOfMeasure;
 use App\Models\Master\Procurement\Vendor;
 use App\Models\Master\Product\Product;
-use App\Models\NumberingDocument;
 use App\Models\Transaction\AssetManagement\AssetMaintenanceRecord;
 use App\Models\Transaction\Procurement\PurchaseRequest;
 use App\Services\Administrator\Workflow\ApprovalService;
@@ -383,6 +384,7 @@ class PurchaseRequestController extends Controller
                     'remarks' => $item->remarks ?? '',
                     'requires_po' => $item->requires_po,
                     'tax_included' => $item->tax_included,
+                    'tax_id' => $item->tax_id,
                 ])->all(),
             ],
         ]);
@@ -680,7 +682,7 @@ class PurchaseRequestController extends Controller
         if ($purchaseRequest->asset_maintenance_record_id !== null) {
             $maintenanceRecord = AssetMaintenanceRecord::query()->findOrFail($purchaseRequest->asset_maintenance_record_id);
             $maintenanceItems = $purchaseRequest->items()
-                ->get(['item_type', 'quantity', 'estimated_unit_price']);
+                ->get(['item_type', 'quantity', 'estimated_unit_price', 'tax_included', 'tax_rate', 'tax_category']);
 
             if ($maintenanceItems->isEmpty() || $maintenanceItems->contains(fn ($item): bool => $item->item_type !== 'PRODUCT'
                 || $item->estimated_unit_price === null
@@ -692,7 +694,16 @@ class PurchaseRequestController extends Controller
             }
 
             $estimatedPartsCost = $maintenanceItems
-                ->sum(fn ($item): float => (float) $item->quantity * (float) $item->estimated_unit_price);
+                ->sum(function ($item): float {
+                    $amount = (float) $item->quantity * (float) $item->estimated_unit_price;
+                    $rate = (float) ($item->tax_rate ?? 0) / 100;
+
+                    if ($item->tax_category === 'WITHHOLDING') {
+                        return $amount - round($amount * $rate);
+                    }
+
+                    return $amount + (! $item->tax_included ? round($amount * $rate) : 0);
+                });
 
             if ($estimatedPartsCost > (float) $maintenanceRecord->estimated_cost) {
                 throw ValidationException::withMessages([
@@ -706,12 +717,22 @@ class PurchaseRequestController extends Controller
                 $purchaseRequest,
                 $user,
             ): void {
-                $purchaseRequest->load('department');
+                $purchaseRequest->load(['company:id,code', 'department:id,code']);
+                $branchIds = $purchaseRequest->items()
+                    ->whereNotNull('branch_id')
+                    ->distinct()
+                    ->pluck('branch_id');
+                $branchCode = $branchIds->count() === 1
+                    ? Branch::query()->whereKey($branchIds->first())->value('code')
+                    : 'MULTI';
 
                 $number = $this->numberingService->generate(
-                    NumberingDocument::CODE_PURCHASE_REQUEST,
+                    NumberingModuleCode::PurchaseRequest,
                     [
+                        'company' => $purchaseRequest->company?->code,
                         'department' => $purchaseRequest->department->code,
+                        'branch' => $branchCode,
+                        'document_type' => 'PR',
                     ],
                 );
 
@@ -765,7 +786,7 @@ class PurchaseRequestController extends Controller
                 ->where('is_active', true)
                 ->whereHas('departments', fn ($query) => $query->whereIn('mst_org_departments.id', $departmentIds))
                 ->orderBy('name')
-                ->with(['departments:id', 'branches:id'])
+                ->with('departments:id')
                 ->get(['id', 'code', 'name', 'group'])
                 ->map(fn (Product $product): array => [
                     'id' => $product->id,
@@ -773,7 +794,6 @@ class PurchaseRequestController extends Controller
                     'name' => $product->name,
                     'group' => $product->group,
                     'department_ids' => $product->departments->pluck('id')->all(),
-                    'branch_ids' => $product->branches->pluck('id')->all(),
                 ]),
             'companies' => Company::query()
                 ->where('is_active', true)
@@ -792,6 +812,10 @@ class PurchaseRequestController extends Controller
             'vendors' => Vendor::query()
                 ->orderBy('name')
                 ->get(['id', 'code', 'name', 'is_active']),
+            'taxes' => Tax::query()
+                ->where('is_active', true)
+                ->orderBy('name')
+                ->get(['id', 'code', 'name', 'rate', 'category']),
             'unitsOfMeasure' => UnitOfMeasure::query()
                 ->where('is_active', true)
                 ->orderBy('name')
@@ -828,6 +852,7 @@ class PurchaseRequestController extends Controller
 
         foreach ($items as $item) {
             $branch = $branches->get($item['delivery_branch_id'] ?? null);
+            $tax = isset($item['tax_id']) ? Tax::query()->where('is_active', true)->find($item['tax_id']) : null;
 
             $purchaseRequest->items()->create([
                 'branch_id' => $branch?->id,
@@ -845,6 +870,11 @@ class PurchaseRequestController extends Controller
                 'vendor_url' => $item['vendor_url'] ?? null,
                 'requires_po' => $item['requires_po'] ?? false,
                 'tax_included' => $item['tax_included'] ?? false,
+                'tax_id' => $item['tax_id'] ?? null,
+                'tax_code' => $tax?->code,
+                'tax_name' => $tax?->name,
+                'tax_rate' => $tax?->rate,
+                'tax_category' => $tax?->category,
                 'required_date' => $item['required_date'] ?? null,
                 'delivery_address' => $branch?->address ?? $branch?->name,
                 'remarks' => $item['remarks'] ?? null,

@@ -10,6 +10,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class AssetMaintenanceComponent extends Model
 {
+    protected $table = 'trx_asset_maintenance_components';
+
     use HasBranchAccessScope;
     use HasDepartmentAccessScope;
     use HasUlids;

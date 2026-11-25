@@ -612,9 +612,19 @@ class ApprovalService
      * Only the current PENDING level is returned.
      * WAITING levels never appear in the inbox.
      */
-    public function inbox(User $user)
+    public function inbox(User $user, ?string $departmentId = null)
     {
         $departmentIds = $this->departmentAccess->departmentIds($user);
+
+        if ($departmentId !== null) {
+            $departmentIds = in_array($departmentId, $departmentIds, true)
+                ? [$departmentId]
+                : [];
+        }
+
+        if ($departmentIds === []) {
+            return collect();
+        }
 
         return ApprovalRequestLevel::query()
             ->with([

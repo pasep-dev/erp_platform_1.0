@@ -2,6 +2,7 @@
 import { onMounted } from 'vue'
 import { route } from 'ziggy-js'
 import Button from 'primevue/button'
+import PrintDocumentHeader from '@/components/print/PrintDocumentHeader.vue'
 
 interface DisposalSnapshot {
     number: string
@@ -90,12 +91,7 @@ onMounted(() => {
         </div>
 
         <article class="disposal-document space-y-5 border border-gray-300 p-8 text-[11px] leading-relaxed">
-            <header class="border-b-2 border-purple-900 pb-4 text-center">
-                <p class="text-xs font-bold uppercase tracking-[0.25em] text-purple-900">Asset Management</p>
-                <h1 class="mt-2 text-2xl font-bold uppercase tracking-wide">Pengajuan Pelepasan Aset</h1>
-                <p class="mt-1 text-sm font-semibold">{{ disposal.number }}</p>
-                <p class="mt-1 text-[10px] text-gray-500">Dokumen pengajuan untuk ditinjau dan ditandatangani oleh management / direktur.</p>
-            </header>
+            <PrintDocumentHeader domain="asset-management" title="Pengajuan Pelepasan Aset" :number="disposal.number" :company-name="disposal.asset_snapshot.company" :date-label="`Tanggal pengajuan · ${date(disposal.created_at)}`" />
 
             <section class="grid grid-cols-2 gap-x-8 gap-y-2">
                 <p><strong>Status:</strong> Menunggu Keputusan</p>

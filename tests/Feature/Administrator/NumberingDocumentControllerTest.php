@@ -151,19 +151,33 @@ class NumberingDocumentControllerTest extends TestCase
                 ->where('documents.data.1.module', null));
     }
 
-    public function test_user_cannot_create_a_rule_for_an_unregistered_module(): void
+    public function test_user_cannot_create_a_rule_for_a_registered_but_unintegrated_module(): void
     {
         $user = $this->userWithPermissions(
             'numbering.document.view',
             'numbering.document.create',
         );
+        NumberingModule::query()->create([
+            'code' => 'SALES_ORDER',
+            'name' => 'Sales Order',
+            'category' => 'Sales',
+            'default_pattern' => null,
+            'sequence_length' => null,
+            'reset_period' => null,
+            'is_active' => true,
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('administrator.numbering-documents.index'))
+            ->assertInertia(fn (AssertableInertia $page) => $page
+                ->missing('modules.SALES_ORDER'));
 
         $this->actingAs($user)
             ->from(route('administrator.numbering-documents.index'))
             ->post(route('administrator.numbering-documents.store'), [
-                'code' => 'CUSTOM_VENDOR',
-                'name' => 'Custom Vendor',
-                'pattern' => 'VEND-{SEQ}',
+                'code' => 'SALES_ORDER',
+                'name' => 'Sales Order',
+                'pattern' => 'SO-{SEQ}',
                 'sequence_length' => 6,
                 'sequence_start' => 1,
                 'reset_period' => 'never',
@@ -307,6 +321,40 @@ class NumberingDocumentControllerTest extends TestCase
         $this->assertDatabaseHas('numbering_documents', [
             'id' => $document->id,
             'code' => 'PURCHASE_REQUEST',
+        ]);
+    }
+
+    public function test_legacy_rule_cannot_be_activated_for_an_unintegrated_module(): void
+    {
+        $user = $this->userWithPermissions('numbering.document.update');
+        $document = NumberingDocument::query()->create([
+            'code' => 'LEGACY_VENDOR',
+            'name' => 'Legacy Vendor Rule',
+            'pattern' => 'VND-{SEQ}',
+            'sequence_length' => 6,
+            'sequence_start' => 1,
+            'reset_period' => 'never',
+            'is_active' => false,
+        ]);
+
+        $this->actingAs($user)
+            ->from(route('administrator.numbering-documents.index'))
+            ->put(route('administrator.numbering-documents.update', $document), [
+                'code' => 'LEGACY_VENDOR',
+                'name' => 'Legacy Vendor Rule',
+                'pattern' => 'VND-{SEQ}',
+                'sequence_length' => 6,
+                'sequence_start' => 1,
+                'reset_period' => 'never',
+                'is_active' => true,
+            ])
+            ->assertSessionHasErrors([
+                'is_active' => 'Document numbering cannot be enabled for an unintegrated module.',
+            ]);
+
+        $this->assertDatabaseHas('numbering_documents', [
+            'id' => $document->id,
+            'is_active' => false,
         ]);
     }
 

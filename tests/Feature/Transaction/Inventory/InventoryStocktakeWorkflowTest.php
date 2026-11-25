@@ -18,6 +18,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
 use Inertia\Testing\AssertableInertia as Assert;
 use Spatie\Permission\Models\Permission;
+use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
 class InventoryStocktakeWorkflowTest extends TestCase
@@ -48,7 +49,35 @@ class InventoryStocktakeWorkflowTest extends TestCase
             'product' => $product->id,
         ]), ['minimum_quantity' => null])->assertSessionHasNoErrors();
 
-        $this->assertDatabaseCount('inventory_stock_thresholds', 0);
+        $this->assertDatabaseCount('trx_inventory_stock_thresholds', 0);
+    }
+
+    public function test_owner_can_view_inventory_but_cannot_edit_stock(): void
+    {
+        [$owner, $department, $location, $product] = $this->createInventoryContext('owner-read-only');
+        $ownerRole = Role::query()->create([
+            'name' => 'Owner',
+            'guard_name' => 'web',
+        ]);
+        $ownerRole->givePermissionTo(Permission::query()->firstOrCreate([
+            'name' => 'consumable.view',
+            'guard_name' => 'web',
+        ]));
+        $owner->assignRole($ownerRole);
+
+        $this->actingAs($owner)
+            ->get(route('transaction.inventory.index'))
+            ->assertOk();
+
+        $this->actingAs($owner)
+            ->put(route('transaction.inventory.minimum-stock.update', [
+                'department' => $department->id,
+                'location' => $location->id,
+                'product' => $product->id,
+            ]), ['minimum_quantity' => 5])
+            ->assertForbidden();
+
+        $this->assertDatabaseCount('trx_inventory_stock_thresholds', 0);
     }
 
     public function test_stocktake_posts_quantity_difference_as_append_only_adjustment_movement(): void
@@ -82,7 +111,7 @@ class InventoryStocktakeWorkflowTest extends TestCase
 
         $this->assertSame(3.0, $this->balance($product, $location));
         $this->assertSame(2, InventoryStockMovement::query()->count());
-        $this->assertDatabaseHas('inventory_document_items', [
+        $this->assertDatabaseHas('trx_inventory_document_items', [
             'inventory_stocktake_item_id' => $item->id,
             'quantity' => 2,
         ]);
@@ -112,7 +141,7 @@ class InventoryStocktakeWorkflowTest extends TestCase
 
         $this->assertSame(6.0, $this->balance($product, $location));
         $this->assertSame(InventoryStocktake::STATUS_COUNTED, $stocktake->fresh()->status);
-        $this->assertDatabaseCount('inventory_documents', 0);
+        $this->assertDatabaseCount('trx_inventory_documents', 0);
     }
 
     public function test_serial_stocktake_records_missing_and_unexpected_serials_as_movements(): void
@@ -155,8 +184,8 @@ class InventoryStocktakeWorkflowTest extends TestCase
             ->all();
 
         $this->assertSame(['SN-A', 'SN-C'], $serialBalances);
-        $this->assertDatabaseCount('inventory_stock_movements', 4);
-        $this->assertDatabaseCount('inventory_document_items', 2);
+        $this->assertDatabaseCount('trx_inventory_stock_movements', 4);
+        $this->assertDatabaseCount('trx_inventory_document_items', 2);
     }
 
     /** @return array{User, Department, Location, Product} */

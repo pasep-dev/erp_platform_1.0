@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { router } from '@inertiajs/vue3'
+import { router, useForm } from '@inertiajs/vue3'
 import { route } from 'ziggy-js'
 import { computed, ref, watch } from 'vue'
 import AppLayout from '@/layout/AppLayout.vue'
 import Button from 'primevue/button'
+import Dialog from 'primevue/dialog'
 import Tag from 'primevue/tag'
 import CrudTable from '@/components/crud/CrudTable.vue'
 import AppPagination from '@/components/common/AppPagination.vue'
@@ -57,6 +58,9 @@ const perPage = ref(15)
 const currentPage = ref(1)
 const search = ref('')
 const queueStatus = ref('ALL')
+const importVisible = ref(false)
+const importInput = ref<HTMLInputElement | null>(null)
+const importForm = useForm<{ file: File | null }>({ file: null })
 const filteredRows = computed(() => {
     const keyword = search.value.trim().toLocaleLowerCase('id-ID')
 
@@ -78,6 +82,13 @@ const pageCount = computed(() => Math.max(1, Math.ceil(filteredRows.value.length
 const visibleRows = computed(() => filteredRows.value.slice((currentPage.value - 1) * perPage.value, currentPage.value * perPage.value))
 const paginationMeta = computed(() => ({ total: filteredRows.value.length }))
 
+function registrationHref(item: QueueItem): string {
+    const url = new URL(route('transaction.asset-management.registrations.create'), window.location.origin)
+    url.searchParams.set('goods_receipt_item_id', item.goods_receipt_item_id)
+
+    return `${url.pathname}${url.search}`
+}
+
 watch([search, queueStatus, perPage], () => {
     currentPage.value = 1
 })
@@ -86,9 +97,25 @@ function updatePerPage(): void {
     currentPage.value = 1
 }
 
-function registerItem(item: QueueItem): void {
-    router.get(route('transaction.asset-management.registrations.create'), {
-        goods_receipt_item_id: item.goods_receipt_item_id,
+function chooseImportFile(event: Event): void {
+    importForm.file = (event.target as HTMLInputElement).files?.[0] ?? null
+}
+
+function submitImport(): void {
+    if (importForm.file === null) {
+        return
+    }
+
+    importForm.post(route('transaction.asset-management.directory.import'), {
+        forceFormData: true,
+        preserveScroll: true,
+        onSuccess: () => {
+            importVisible.value = false
+            importForm.reset()
+            if (importInput.value) {
+                importInput.value.value = ''
+            }
+        },
     })
 }
 
@@ -97,7 +124,10 @@ function registerItem(item: QueueItem): void {
 <template>
     <div class="procurement-ui space-y-6">
         <AssetManagementPageHeader title="Registration" section="Registration" description="Proses registrasi aset dari GR. Aset yang sudah tercatat dapat dicari di Asset Directory.">
-            <template #actions><Button v-if="can_create" label="Registrasi Aset Existing" icon="pi pi-plus" severity="secondary" outlined @click="router.get(route('transaction.asset-management.registrations.create'))" /></template>
+            <template #actions>
+                <Button v-if="can_create" label="Registrasi Aset Existing" icon="pi pi-plus" severity="secondary" outlined @click="router.get(route('transaction.asset-management.registrations.create'))" />
+                <Button v-if="can_create" label="Import Aset Existing" icon="pi pi-upload" severity="secondary" outlined @click="importVisible = true" />
+            </template>
         </AssetManagementPageHeader>
 
         <section class="space-y-3">
@@ -114,11 +144,34 @@ function registerItem(item: QueueItem): void {
                     <template #cell-product="{ row }"><div class="font-medium">{{ row.product.name }}</div><div class="text-xs text-gray-500">{{ row.product.code }}<template v-if="row.product.type"> · {{ row.product.type }}</template></div></template>
                     <template #cell-status="{ row }"><Tag :value="row.status" :severity="row.status_severity" /></template>
                     <template #actions="{ row }">
-                        <Button v-if="can_create" icon="pi pi-plus" severity="info" text rounded aria-label="Registrasi Unit Aset" :disabled="row.queue_item.has_fractional_quantity" v-tooltip.top="row.queue_item.has_fractional_quantity ? 'Kuantitas produk ASSET harus berupa unit penuh' : 'Registrasi Unit Aset'" @click="registerItem(row.queue_item)" />
+                        <a
+                            v-if="can_create"
+                            :href="registrationHref(row.queue_item)"
+                            class="inline-flex h-9 w-9 items-center justify-center rounded-full text-blue-600 transition hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:text-blue-400 dark:hover:bg-blue-500/10"
+                            :aria-label="`Registrasikan ${row.product.name}`"
+                            :title="row.queue_item.has_fractional_quantity ? 'Buka registrasi; kuantitas pecahan akan ditolak saat disimpan' : 'Registrasi Unit Aset'"
+                        >
+                            <i class="pi pi-plus" aria-hidden="true"></i>
+                        </a>
+                        <span v-else class="text-xs text-gray-400" title="Akses registration.create diperlukan">Tidak ada akses</span>
                     </template>
                 </CrudTable>
                 <AppPagination v-if="queue.length > 0" v-model:per-page="perPage" v-model:page="currentPage" :meta="paginationMeta" :client-page-count="pageCount" @change="updatePerPage" />
             </div>
         </section>
+
+        <Dialog v-model:visible="importVisible" modal header="Import Aset Existing" :style="{ width: 'min(42rem, 94vw)' }">
+            <div class="space-y-4">
+                <p class="text-sm text-gray-600 dark:text-gray-300">Gunakan template CSV untuk memasukkan aset existing. Kode produk, perusahaan, departemen, dan lokasi harus sesuai dengan master data. Nomor aset dibuat otomatis dari aturan Document Numbering.</p>
+                <a :href="route('transaction.asset-management.directory.template')" class="inline-flex items-center gap-2 text-sm font-medium text-purple-700 hover:underline dark:text-purple-300"><i class="pi pi-download" /> Unduh template CSV</a>
+                <input ref="importInput" type="file" accept=".csv,text/csv" class="block w-full rounded-lg border border-gray-300 p-2 text-sm dark:border-gray-700" @change="chooseImportFile" />
+                <small v-if="importForm.errors.file" class="block whitespace-pre-line text-red-600">{{ importForm.errors.file }}</small>
+                <p class="text-xs text-gray-500">Satu baris CSV menghasilkan satu unit aset dan satu nomor aset unik. Untuk beberapa unit, gunakan satu baris per unit. Semua baris diperiksa sebelum disimpan.</p>
+            </div>
+            <template #footer>
+                <Button label="Batal" severity="secondary" text @click="importVisible = false" />
+                <Button label="Import" icon="pi pi-upload" :loading="importForm.processing" :disabled="!importForm.file" @click="submitImport" />
+            </template>
+        </Dialog>
     </div>
 </template>

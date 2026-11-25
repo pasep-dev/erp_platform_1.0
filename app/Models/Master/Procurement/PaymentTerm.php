@@ -11,7 +11,7 @@ class PaymentTerm extends Model
     use HasUlids;
     use SoftDeletes;
 
-    protected $table = 'mst_payment_terms';
+    protected $table = 'mst_prc_payment_terms';
 
     protected $fillable = [
         'code',

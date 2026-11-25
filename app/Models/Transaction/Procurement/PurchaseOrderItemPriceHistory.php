@@ -23,7 +23,7 @@ class PurchaseOrderItemPriceHistory extends Model
     use HasDepartmentAccessScope;
     use HasUlids;
 
-    protected $table = 'purchase_order_item_price_histories';
+    protected $table = 'trx_purchase_order_item_price_histories';
 
     protected $fillable = [
         'purchase_order_item_id',

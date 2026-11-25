@@ -2,16 +2,20 @@
 
 namespace App\Services\AssetManagement;
 
+use App\Enums\NumberingModuleCode;
 use App\Models\Transaction\AssetManagement\Asset;
 use App\Models\Transaction\AssetManagement\AssetAssignmentHistory;
 use App\Models\Transaction\AssetManagement\AssetMaintenanceRecord;
 use App\Models\User;
 use App\Services\BranchAccessService;
+use App\Services\NumberingService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 class AssetAssignmentService
 {
+    public function __construct(private readonly NumberingService $numberingService) {}
+
     /**
      * @return array<string, mixed>
      */
@@ -80,7 +84,16 @@ class AssetAssignmentService
                 ]);
             }
 
-            $lockedAsset->load(['custodian', 'company', 'department', 'location', 'branch']);
+            $lockedAsset->load([
+                'custodian',
+                'company',
+                'department',
+                'location',
+                'branch',
+                'type',
+                'category',
+                'product',
+            ]);
             $fromSnapshot = $this->snapshot($lockedAsset);
             $fromCustodianId = $lockedAsset->custodian_id;
             $fromCondition = $lockedAsset->condition;
@@ -90,8 +103,24 @@ class AssetAssignmentService
             $lockedAsset->save();
             $lockedAsset->setRelation('custodian', $activeAssignee);
 
+            $eventType = $fromCustodianId === null ? 'ASSIGNED' : 'TRANSFERRED';
+
             return $lockedAsset->assignmentHistories()->create([
-                'event_type' => $fromCustodianId === null ? 'ASSIGNED' : 'TRANSFERRED',
+                'number' => $this->numberingService->generate(
+                    NumberingModuleCode::AssetAssignment,
+                    [
+                        'company' => $lockedAsset->company?->code,
+                        'department' => $lockedAsset->department?->code,
+                        'branch' => $lockedAsset->branch?->code,
+                        'location' => $lockedAsset->location?->code,
+                        'asset_type' => $lockedAsset->type?->code,
+                        'category' => $lockedAsset->category?->code,
+                        'product' => $lockedAsset->product?->code,
+                        'document_type' => 'ASSET_ASSIGNMENT',
+                        'event_type' => $eventType,
+                    ],
+                ),
+                'event_type' => $eventType,
                 'from_condition' => $fromCondition,
                 'to_condition' => $condition,
                 'from_custodian_id' => $fromCustodianId,
@@ -116,7 +145,16 @@ class AssetAssignmentService
                 ]);
             }
 
-            $lockedAsset->load(['custodian', 'company', 'department', 'location', 'branch']);
+            $lockedAsset->load([
+                'custodian',
+                'company',
+                'department',
+                'location',
+                'branch',
+                'type',
+                'category',
+                'product',
+            ]);
             $fromSnapshot = $this->snapshot($lockedAsset);
             $fromCustodianId = $lockedAsset->custodian_id;
             $fromCondition = $lockedAsset->condition;
@@ -127,6 +165,20 @@ class AssetAssignmentService
             $lockedAsset->setRelation('custodian', null);
 
             return $lockedAsset->assignmentHistories()->create([
+                'number' => $this->numberingService->generate(
+                    NumberingModuleCode::AssetAssignment,
+                    [
+                        'company' => $lockedAsset->company?->code,
+                        'department' => $lockedAsset->department?->code,
+                        'branch' => $lockedAsset->branch?->code,
+                        'location' => $lockedAsset->location?->code,
+                        'asset_type' => $lockedAsset->type?->code,
+                        'category' => $lockedAsset->category?->code,
+                        'product' => $lockedAsset->product?->code,
+                        'document_type' => 'ASSET_ASSIGNMENT',
+                        'event_type' => 'RETURNED',
+                    ],
+                ),
                 'event_type' => 'RETURNED',
                 'from_condition' => $fromCondition,
                 'to_condition' => $condition,

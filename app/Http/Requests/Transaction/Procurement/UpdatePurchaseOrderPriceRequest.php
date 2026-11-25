@@ -33,7 +33,7 @@ class UpdatePurchaseOrderPriceRequest extends FormRequest
                 'required',
                 'string',
                 'distinct',
-                Rule::exists('purchase_order_items', 'id')
+                Rule::exists('trx_purchase_order_items', 'id')
                     ->where('purchase_order_id', $purchaseOrder?->id),
             ],
             'items.*.unit_price' => ['required', 'numeric', 'min:0', 'decimal:0,2'],

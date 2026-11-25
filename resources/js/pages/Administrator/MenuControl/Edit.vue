@@ -169,7 +169,7 @@ function resetToDefault(): void {
             </h2>
             <p class="mt-1 text-sm text-amber-800 dark:text-amber-300">
                 Administrator selalu mendapatkan seluruh menu dan tidak dapat
-                dibatasi dari halaman ini.
+                dibatasi dari halaman ini. Menu Owner dapat diatur di sini.
             </p>
         </div>
 

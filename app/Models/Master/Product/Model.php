@@ -12,7 +12,7 @@ class Model extends EloquentModel
     use HasUlids;
     use SoftDeletes;
 
-    protected $table = 'mst_asset_models';
+    protected $table = 'mst_product_models';
 
     protected $fillable = [
         'brand_id',

@@ -2,6 +2,7 @@
 
 namespace App\Services\AssetManagement;
 
+use App\Enums\NumberingModuleCode;
 use App\Models\Master\Organization\Company;
 use App\Models\Master\Organization\Department;
 use App\Models\Master\Organization\Location;
@@ -10,6 +11,7 @@ use App\Models\Transaction\AssetManagement\Asset;
 use App\Models\User;
 use App\Services\BranchAccessService;
 use App\Services\DepartmentAccessService;
+use App\Services\NumberingService;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
@@ -23,10 +25,11 @@ class AssetDirectoryService
     public function __construct(
         private readonly DepartmentAccessService $departmentAccess,
         private readonly BranchAccessService $branchAccess,
+        private readonly NumberingService $numberingService,
     ) {}
 
     public const IMPORT_HEADERS = [
-        'asset_number', 'product_code', 'company_code', 'department_code',
+        'product_code', 'company_code', 'department_code',
         'location_code', 'branch_code', 'custodian_email', 'serial_number',
         'acquisition_date', 'acquisition_cost', 'warranty_duration_months',
         'specifications', 'remarks',
@@ -55,7 +58,7 @@ class AssetDirectoryService
         $user = $request->user();
         abort_if($user === null, 401);
 
-        $query = $this->departmentAccess->scopeByDepartment(Asset::query(), $user, 'assets.department_id');
+        $query = $this->departmentAccess->scopeByDepartment(Asset::query(), $user, 'trx_assets.department_id');
         $search = trim($request->string('search')->toString());
         $status = $request->string('status')->toString();
 
@@ -161,7 +164,7 @@ class AssetDirectoryService
             ->all();
 
         $accessibleDepartmentIds = $this->departmentAccess->departmentIds($actor);
-        $products = Product::query()->with(['category', 'type', 'brand', 'model', 'departments:id', 'branches:id'])
+        $products = Product::query()->with(['category', 'type', 'brand', 'model', 'departments:id'])
             ->whereHas('departments', fn (Builder $query) => $query->whereIn('mst_org_departments.id', $accessibleDepartmentIds))
             ->where('group', 'ASSET')->whereIn('code', $codes('product_code'))->get()->keyBy('code');
         $companies = Company::query()->whereIn('code', $codes('company_code'))->get()->keyBy('code');
@@ -173,7 +176,6 @@ class AssetDirectoryService
 
         $validatedRows = [];
         $errors = [];
-        $numbers = [];
         $serialNumbers = [];
 
         foreach ($rows as $row) {
@@ -186,7 +188,6 @@ class AssetDirectoryService
 
             $data = array_map(fn ($value) => trim((string) $value), $row['data']);
             $validator = Validator::make($data, [
-                'asset_number' => ['required', 'string', 'max:100', 'regex:/^[A-Z0-9 .\\/$+%-]+$/'],
                 'product_code' => ['required', 'string', 'max:100'],
                 'company_code' => ['required', 'string', 'max:50'],
                 'department_code' => ['required', 'string', 'max:50'],
@@ -237,11 +238,6 @@ class AssetDirectoryService
 
                 continue;
             }
-            if (! $product->branches->contains('id', $location->branch_id)) {
-                $errors[] = "Baris {$line}: Produk tidak tersedia untuk branch lokasi aset tersebut.";
-
-                continue;
-            }
             if ($data['branch_code'] !== '' && $location->branch?->code !== $data['branch_code']) {
                 $errors[] = "Baris {$line}: Cabang tidak sesuai dengan cabang lokasi.";
 
@@ -272,13 +268,6 @@ class AssetDirectoryService
                 continue;
             }
 
-            if (isset($numbers[$data['asset_number']])) {
-                $errors[] = "Baris {$line}: Nomor aset duplikat di dalam file.";
-
-                continue;
-            }
-            $numbers[$data['asset_number']] = true;
-
             if ($data['serial_number'] !== '') {
                 if (isset($serialNumbers[$data['serial_number']])) {
                     $errors[] = "Baris {$line}: Serial number duplikat di dalam file.";
@@ -307,13 +296,6 @@ class AssetDirectoryService
             ];
         }
 
-        $existingNumbers = Asset::query()->whereIn('number', array_keys($numbers))->pluck('number')->all();
-        foreach ($validatedRows as $row) {
-            if (in_array($row['data']['asset_number'], $existingNumbers, true)) {
-                $errors[] = "Baris {$row['line']}: Nomor aset sudah terdaftar.";
-            }
-        }
-
         $existingSerials = Asset::query()->whereIn('serial_number', array_keys($serialNumbers))->pluck('serial_number')->all();
         foreach ($validatedRows as $row) {
             if ($row['data']['serial_number'] !== '' && in_array($row['data']['serial_number'], $existingSerials, true)) {
@@ -334,7 +316,19 @@ class AssetDirectoryService
                     : null;
 
                 Asset::query()->create([
-                    'number' => $data['asset_number'],
+                    'number' => $this->numberingService->generate(
+                        NumberingModuleCode::Asset,
+                        [
+                            'company' => $row['company']->code,
+                            'department' => $row['department']->code,
+                            'asset_type' => $row['product']->type->code,
+                            'category' => $row['product']->category->code,
+                            'product' => $row['product']->code,
+                            'branch' => $row['location']->branch?->code ?? $row['location']->code,
+                            'location' => $row['location']->code,
+                            'document_type' => Asset::METHOD_EXISTING,
+                        ],
+                    ),
                     'registration_method' => Asset::METHOD_EXISTING,
                     'status' => Asset::STATUS_ACTIVE,
                     'product_id' => $row['product']->id,

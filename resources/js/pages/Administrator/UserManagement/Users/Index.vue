@@ -168,10 +168,7 @@ function submitSearch(): void {
         route("administrator.users.index"),
         {
             search: search.value || undefined,
-            is_active:
-                selectedStatus.value === allFilterValue
-                    ? undefined
-                    : selectedStatus.value,
+            is_active: selectedStatus.value,
             per_page: perPage.value,
         },
         {
@@ -184,7 +181,7 @@ function submitSearch(): void {
 
 function clearSearch(): void {
     search.value = "";
-    selectedStatus.value = allFilterValue;
+    selectedStatus.value = "1";
     perPage.value = 15;
     submitSearch();
 }

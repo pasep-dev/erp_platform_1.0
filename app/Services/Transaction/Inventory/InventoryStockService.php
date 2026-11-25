@@ -216,15 +216,6 @@ class InventoryStockService
             return;
         }
 
-        if (! $product->branches()->whereKey($location->branch_id)->exists()) {
-            $integration->update([
-                'status' => InventoryReceiptIntegration::STATUS_FAILED,
-                'failure_message' => 'Produk tidak terdaftar untuk branch gudang penerimaan.',
-            ]);
-
-            return;
-        }
-
         InventoryDepartmentWarehouse::query()->firstOrCreate(
             ['department_id' => $receipt->department_id, 'location_id' => $location->id],
             ['configured_by' => $receipt->posted_by],

@@ -16,6 +16,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class AssetAuditSession extends Model
 {
+    protected $table = 'trx_asset_audit_sessions';
+
     use HasBranchAccessScope;
     use HasDepartmentAccessScope;
     use HasUlids;

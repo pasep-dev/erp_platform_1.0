@@ -12,7 +12,7 @@ class Vendor extends Model
     use HasUlids;
     use SoftDeletes;
 
-    protected $table = 'mst_vendors';
+    protected $table = 'mst_prc_vendors';
 
     protected $fillable = [
         'vendor_type_id',

@@ -25,7 +25,8 @@ class CategoryRequest extends FormRequest
                 'nullable',
                 'string',
                 'size:26',
-                Rule::exists('mst_asset_categories', 'id')
+                Rule::exists('mst_product_categories', 'id')
+                    ->whereNull('parent_id')
                     ->whereNull('deleted_at'),
                 Rule::notIn([$categoryId]),
             ],
@@ -35,7 +36,7 @@ class CategoryRequest extends FormRequest
                 'string',
                 'max:50',
                 'alpha_dash',
-                Rule::unique('mst_asset_categories', 'code')
+                Rule::unique('mst_product_categories', 'code')
                     ->ignore($categoryId)
                     ->whereNull('deleted_at'),
             ],

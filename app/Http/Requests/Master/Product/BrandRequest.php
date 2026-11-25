@@ -20,15 +20,17 @@ class BrandRequest extends FormRequest
             : $brand;
 
         return [
-            'code' => [
-                'required',
-                'string',
-                'max:50',
-                'alpha_dash',
-                Rule::unique('mst_asset_brands', 'code')
-                    ->ignore($brandId)
-                    ->whereNull('deleted_at'),
-            ],
+            'code' => $this->isMethod('POST')
+                ? ['prohibited']
+                : [
+                    'required',
+                    'string',
+                    'max:50',
+                    'alpha_dash',
+                    Rule::unique('mst_product_brands', 'code')
+                        ->ignore($brandId)
+                        ->whereNull('deleted_at'),
+                ],
 
             'name' => [
                 'required',
@@ -47,8 +49,9 @@ class BrandRequest extends FormRequest
                 'string',
                 'size:26',
                 'distinct',
-                Rule::exists('mst_asset_categories', 'id')
+                Rule::exists('mst_product_categories', 'id')
                     ->whereNull('deleted_at')
+                    ->whereNull('parent_id')
                     ->where('is_active', true),
             ],
 

@@ -20,6 +20,7 @@ interface Tax {
     code: string;
     name: string;
     rate: string | number;
+    category: "ADDITIVE" | "WITHHOLDING";
     description: string | null;
     is_active: boolean;
     created_at: string;
@@ -64,6 +65,10 @@ const columns = [
     {
         key: "rate",
         label: "Rate",
+    },
+    {
+        key: "category",
+        label: "Kategori",
     },
     {
         key: "description",
@@ -168,6 +173,10 @@ function confirmDelete(): void {
                     <span class="font-medium text-gray-700 dark:text-gray-300">
                         {{ row.rate }}%
                     </span>
+                </template>
+
+                <template #cell-category="{ row }">
+                    {{ row.category === "WITHHOLDING" ? "Potong (PPh)" : "Menambah total (PPN)" }}
                 </template>
 
                 <template #cell-description="{ row }">

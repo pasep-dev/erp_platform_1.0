@@ -11,7 +11,7 @@ class LicenseType extends Model
     use HasUlids;
     use SoftDeletes;
 
-    protected $table = 'mst_asset_license_types';
+    protected $table = 'mst_product_license_types';
 
     protected $fillable = [
         'code',

@@ -26,7 +26,7 @@ class AuthorizeRoutePermission
 
             abort_unless(
                 $user !== null && (
-                    $user->hasRole(['Administrator', 'Owner'])
+                    $user->isAdministrator()
                     || collect($permissions)->contains(
                         fn (string $permission): bool => $user->can($permission),
                     )
@@ -51,6 +51,10 @@ class AuthorizeRoutePermission
         }
 
         if ($routeName === 'profile.show') {
+            return [];
+        }
+
+        if ($routeName === 'numbering.preview') {
             return [];
         }
 
@@ -92,7 +96,7 @@ class AuthorizeRoutePermission
             return ['system.settings.view'];
         }
 
-        if (in_array($routeName, ['settings.update', 'settings.modules.store', 'settings.modules.update'], true)) {
+        if (in_array($routeName, ['settings.update', 'settings.modules.update'], true)) {
             return ['system.settings.update'];
         }
 
@@ -100,8 +104,12 @@ class AuthorizeRoutePermission
             return ['system.settings.backup'];
         }
 
-        if (str_starts_with($routeName, 'approval.')) {
-            return [];
+        if ($routeName === 'approval.inbox.index' || $routeName === 'approval.history.index') {
+            return ['approval.view'];
+        }
+
+        if (in_array($routeName, ['approval.inbox.approve', 'approval.inbox.reject'], true)) {
+            return ['approval.approve'];
         }
 
         if (str_starts_with($routeName, 'transaction.procurement.')) {
@@ -180,8 +188,12 @@ class AuthorizeRoutePermission
 
         $action = substr($routeName, strrpos($routeName, '.') + 1);
 
-        if ($permissionPrefix === 'purchase-request' && in_array($action, ['cancel', 'destroy', 'mark-approved'], true)) {
-            return [];
+        if ($permissionPrefix === 'purchase-request' && $action === 'cancel') {
+            return ['purchase-request.cancel'];
+        }
+
+        if ($permissionPrefix === 'purchase-request' && $action === 'mark-approved') {
+            return ['approval.approve'];
         }
 
         if (in_array($action, ['submit', 'cancel'], true)) {
@@ -196,6 +208,13 @@ class AuthorizeRoutePermission
      */
     private function assetManagementPermissions(string $routeName, string $method): ?array
     {
+        if (in_array($routeName, [
+            'transaction.asset-management.directory.template',
+            'transaction.asset-management.directory.import',
+        ], true)) {
+            return ['registration.create'];
+        }
+
         $segments = explode('.', $routeName);
         $module = $segments[2] ?? '';
         $action = end($segments);

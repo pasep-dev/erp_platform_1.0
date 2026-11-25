@@ -11,6 +11,7 @@ import Header from "@/components/content/Header.vue";
 import CrudActions from "@/components/crud/CrudActions.vue";
 import CrudTable from "@/components/crud/CrudTable.vue";
 import DeleteConfirm from "@/components/crud/DeleteConfirm.vue";
+import Button from "primevue/button";
 import { useCrud } from "@/composables/useCrud";
 
 import Modal from "@/components/common/Modal.vue";
@@ -158,6 +159,23 @@ function submitSearch(): void {
     );
 }
 
+function exportProducts(): void {
+    const exportUrl = new URL(route("master.product.products.export"), window.location.origin);
+    const params = {
+        search: search.value.trim(),
+        group: selectedGroup.value !== allGroupValue ? selectedGroup.value : "",
+        status: selectedStatus.value !== allStatusValue ? selectedStatus.value : "",
+    };
+
+    for (const [key, value] of Object.entries(params)) {
+        if (value) {
+            exportUrl.searchParams.set(key, value);
+        }
+    }
+
+    window.location.href = exportUrl.toString();
+}
+
 function onGroupChange(): void {
     submitSearch();
 }
@@ -216,6 +234,13 @@ function confirmDelete(): void {
                     class="w-full sm:w-40"
                     aria-label="Filter status produk"
                     @change="onGroupChange"
+                />
+                <Button
+                    label="Export CSV"
+                    icon="pi pi-download"
+                    severity="secondary"
+                    outlined
+                    @click="exportProducts"
                 />
             </DataTableToolbar>
 

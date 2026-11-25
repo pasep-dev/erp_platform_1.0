@@ -28,7 +28,7 @@ class VendorRequest extends FormRequest
                 'required',
                 'string',
                 'size:26',
-                Rule::exists('mst_vendor_types', 'id')
+                Rule::exists('mst_prc_vendor_types', 'id')
                     ->whereNull('deleted_at')
                     ->where(function ($query) use ($currentVendorTypeId) {
                         $query->where('is_active', true);
@@ -39,15 +39,17 @@ class VendorRequest extends FormRequest
                     }),
             ],
 
-            'code' => [
-                $this->isMethod('POST') ? 'nullable' : 'required',
-                'string',
-                'max:50',
-                'alpha_dash',
-                Rule::unique('mst_vendors', 'code')
-                    ->ignore($vendorId)
-                    ->whereNull('deleted_at'),
-            ],
+            'code' => $this->isMethod('POST')
+                ? ['prohibited']
+                : [
+                    'required',
+                    'string',
+                    'max:50',
+                    'alpha_dash',
+                    Rule::unique('mst_prc_vendors', 'code')
+                        ->ignore($vendorId)
+                        ->whereNull('deleted_at'),
+                ],
 
             'name' => [
                 'required',

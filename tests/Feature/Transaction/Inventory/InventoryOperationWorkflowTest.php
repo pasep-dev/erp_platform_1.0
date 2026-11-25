@@ -86,11 +86,11 @@ class InventoryOperationWorkflowTest extends TestCase
             ],
         ])->assertSessionHasNoErrors();
 
-        $this->assertDatabaseCount('inventory_document_items', 2);
-        $this->assertDatabaseCount('inventory_stock_movements', 3);
+        $this->assertDatabaseCount('trx_inventory_document_items', 2);
+        $this->assertDatabaseCount('trx_inventory_stock_movements', 3);
         $this->assertSame(2.0, $this->balance($product, $warehouse));
         $this->assertSame(['RAM' => '16GB'], $asset->fresh()->specifications);
-        $this->assertDatabaseHas('asset_assignment_histories', [
+        $this->assertDatabaseHas('trx_asset_assignment_histories', [
             'asset_id' => $asset->id,
             'event_type' => 'UPGRADE',
         ]);
@@ -118,8 +118,8 @@ class InventoryOperationWorkflowTest extends TestCase
             ])
             ->assertSessionHasErrors('items');
 
-        $this->assertDatabaseCount('inventory_documents', 0);
-        $this->assertDatabaseCount('inventory_stock_movements', 1);
+        $this->assertDatabaseCount('trx_inventory_documents', 0);
+        $this->assertDatabaseCount('trx_inventory_stock_movements', 1);
         $this->assertSame(1.0, $this->balance($product, $warehouse));
     }
 
@@ -150,7 +150,7 @@ class InventoryOperationWorkflowTest extends TestCase
             'items' => [['product_id' => $product->id, 'quantity' => 2]],
         ])->assertSessionHasNoErrors();
 
-        $this->assertDatabaseCount('inventory_stock_movements', 3);
+        $this->assertDatabaseCount('trx_inventory_stock_movements', 3);
         $this->assertSame(3.0, $this->balance($product, $source));
         $this->assertSame(2.0, $this->balance($product, $target));
 
@@ -181,8 +181,8 @@ class InventoryOperationWorkflowTest extends TestCase
         ])->assertSessionHasNoErrors();
 
         $this->assertSame(3.0, $this->balance($product, $source));
-        $this->assertDatabaseCount('inventory_documents', 3);
-        $this->assertDatabaseCount('inventory_stock_movements', 5);
+        $this->assertDatabaseCount('trx_inventory_documents', 3);
+        $this->assertDatabaseCount('trx_inventory_stock_movements', 5);
     }
 
     /** @return array{User, Company, Department, Location, Product, Category, Type, Brand, ProductModel} */

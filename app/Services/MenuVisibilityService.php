@@ -14,7 +14,7 @@ class MenuVisibilityService
      */
     public function visibleMenuKeysFor(User $user): ?array
     {
-        if ($user->hasGlobalDepartmentAccess()) {
+        if ($user->isAdministrator()) {
             return null;
         }
 

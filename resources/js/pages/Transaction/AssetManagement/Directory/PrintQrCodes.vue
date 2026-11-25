@@ -3,7 +3,7 @@ import { onMounted } from 'vue'
 import AssetQrCode from '@/components/asset/AssetQrCode.vue'
 import AssetBarcode from '@/components/asset/AssetBarcode.vue'
 
-const props = defineProps<{ assets: { id: string; number: string; company_code: string; department_code: string }[] }>()
+const props = defineProps<{ assets: { id: string; number: string; company_code: string; company_name: string; department_code: string }[] }>()
 
 function closePrintTab(): void {
     window.close()
@@ -28,6 +28,7 @@ onMounted(() => {
         <article v-for="asset in props.assets" :key="asset.id" class="qr-code-label">
             <div class="asset-identity">
                 <p class="asset-label-title">ASSET DIRECTORY</p>
+                <p class="asset-company-name">{{ asset.company_name }}</p>
                 <h2>{{ asset.number }}</h2>
                 <div class="asset-org-codes">
                     <span><small>COMPANY</small>{{ asset.company_code }}</span>
@@ -49,6 +50,7 @@ onMounted(() => {
 .qr-code-label { display: grid; width: 100%; min-height: 28mm; grid-template-columns: minmax(0, 1fr) 27mm; align-items: center; gap: 1.5mm; border: 1px solid #d8d5e2; border-left: 1.5mm solid #4c1d95; border-radius: 1.5mm; padding: 2mm; }
 .asset-identity { min-width: 0; }
 .asset-label-title { margin: 0 0 1.2mm; color: #6b21a8; font-size: 5pt; font-weight: 700; letter-spacing: .1em; }
+.asset-company-name { overflow-wrap: anywhere; margin: 0 0 1mm; color: #374151; font-size: 6pt; font-weight: 600; }
 .asset-identity h2 { overflow-wrap: anywhere; margin: 0; color: #111827; font-size: 8pt; font-weight: 700; line-height: 1.2; }
 .asset-org-codes { display: flex; flex-wrap: wrap; gap: 1mm 3mm; margin-top: 2mm; }
 .asset-org-codes span { display: grid; color: #374151; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 6.5pt; font-weight: 700; }

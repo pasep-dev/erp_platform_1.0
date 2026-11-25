@@ -25,7 +25,7 @@ class PaymentTermRequest extends FormRequest
                 'string',
                 'max:50',
                 'alpha_dash',
-                Rule::unique('mst_payment_terms', 'code')
+                Rule::unique('mst_prc_payment_terms', 'code')
                     ->ignore($paymentTermId)
                     ->whereNull('deleted_at'),
             ],

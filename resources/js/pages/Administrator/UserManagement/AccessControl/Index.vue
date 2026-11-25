@@ -62,7 +62,7 @@ const columns = computed(() => [
         label:
             targetType.value === "role"
                 ? "Role Permissions"
-                : "Direct User Permissions",
+                : "Effective Permissions",
     },
     { key: "configured", label: "Configuration" },
 ]);

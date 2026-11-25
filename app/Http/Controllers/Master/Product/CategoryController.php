@@ -50,6 +50,7 @@ class CategoryController extends Controller
     {
         $categories = Category::query()
             ->where('is_active', true)
+            ->whereNull('parent_id')
             ->orderBy('name')
             ->get([
                 'id',
@@ -78,6 +79,7 @@ class CategoryController extends Controller
     {
         $categories = Category::query()
             ->where('is_active', true)
+            ->whereNull('parent_id')
             ->where('id', '!=', $category->id)
             ->orderBy('name')
             ->get([

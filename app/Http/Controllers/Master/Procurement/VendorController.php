@@ -2,11 +2,11 @@
 
 namespace App\Http\Controllers\Master\Procurement;
 
+use App\Enums\NumberingModuleCode;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Master\Procurement\VendorRequest;
 use App\Models\Master\Procurement\Vendor;
 use App\Models\Master\Procurement\VendorType;
-use App\Models\NumberingDocument;
 use App\Services\NumberingService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -73,20 +73,21 @@ class VendorController extends Controller
     ): RedirectResponse {
         $data = $request->validated();
 
-        if (blank($data['code'] ?? null)) {
-            if (! $numberingService->hasActiveDocument(NumberingDocument::CODE_VENDOR)) {
-                throw ValidationException::withMessages([
-                    'code' => 'Enter a vendor code or configure an active VENDOR numbering rule.',
-                ]);
-            }
+        if (! $numberingService->hasActiveDocument(NumberingModuleCode::Vendor)) {
+            throw ValidationException::withMessages([
+                'code' => 'Configure an active VENDOR numbering rule before creating a vendor.',
+            ]);
+        }
 
-            $data['code'] = $numberingService->generate(NumberingDocument::CODE_VENDOR);
+        $data['code'] = mb_strtoupper(
+            $numberingService->generate(NumberingModuleCode::Vendor),
+            'UTF-8',
+        );
 
-            if (Vendor::withTrashed()->where('code', $data['code'])->exists()) {
-                throw ValidationException::withMessages([
-                    'code' => 'Generated vendor code already exists. Update the numbering sequence start.',
-                ]);
-            }
+        if (Vendor::withTrashed()->where('code', $data['code'])->exists()) {
+            throw ValidationException::withMessages([
+                'code' => 'Generated vendor code already exists. Update the numbering sequence start.',
+            ]);
         }
 
         Vendor::create($data);

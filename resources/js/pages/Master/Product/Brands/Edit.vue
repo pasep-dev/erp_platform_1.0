@@ -10,6 +10,7 @@ interface Category {
     id: string;
     code: string;
     name: string;
+    children_count: number;
 }
 
 defineOptions({
@@ -33,9 +34,7 @@ const props = defineProps<{
 const form = useForm({
     code: props.brand.code,
     name: props.brand.name,
-    category_ids: props.brand.categories
-        .filter((category) => props.categories.some((available) => available.id === category.id))
-        .map((category) => category.id),
+    category_ids: props.brand.categories.map((category) => category.id),
     description: props.brand.description ?? "",
     is_active: Boolean(props.brand.is_active),
 });
@@ -118,9 +117,9 @@ const cancel = () => {
                     Categories <span class="text-red-500">*</span>
                 </legend>
                 <p class="mb-3 text-xs text-gray-500 dark:text-gray-400">
-                    Pilih semua kategori produk yang dibuat atau didukung brand ini.
+                    Brand berlaku untuk kategori utama yang dipilih beserta seluruh subkategori aktifnya.
                 </p>
-                <div class="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+                <div class="grid max-h-72 gap-2 overflow-y-auto pr-1 sm:grid-cols-2 xl:grid-cols-3">
                     <label
                         v-for="category in props.categories"
                         :key="category.id"
@@ -135,6 +134,9 @@ const cancel = () => {
                         <span>
                             <span class="block text-sm font-medium text-gray-800 dark:text-gray-100">{{ category.name }}</span>
                             <span class="text-xs text-gray-500 dark:text-gray-400">{{ category.code }}</span>
+                            <span v-if="category.children_count > 0" class="mt-1 block text-xs text-gray-500 dark:text-gray-400">
+                                {{ category.children_count }} subkategori aktif
+                            </span>
                         </span>
                     </label>
                 </div>

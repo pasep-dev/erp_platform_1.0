@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onMounted } from 'vue'
 import Button from 'primevue/button'
+import PrintDocumentHeader from '@/components/print/PrintDocumentHeader.vue'
 
 interface Snapshot {
     custodian_name?: string | null
@@ -13,6 +14,7 @@ interface Snapshot {
 
 interface History {
     id: string
+    number: string
     event_type: string
     from_snapshot: Snapshot | null
     to_snapshot: Snapshot | null
@@ -83,13 +85,7 @@ onMounted(() => {
         </div>
 
         <article class="handover-document">
-            <header class="document-header">
-                <div>
-                    <p class="eyebrow">ASSET MANAGEMENT</p>
-                    <h1>{{ eventTitle }}</h1>
-                </div>
-                <div class="document-date"><span>Tanggal berlaku</span><strong>{{ date(history.effective_at) }}</strong></div>
-            </header>
+            <PrintDocumentHeader domain="asset-management" :title="eventTitle" :number="history.number" :company-name="history.asset.company.name" :date-label="`Tanggal berlaku · ${date(history.effective_at)}`" />
 
             <section class="asset-section">
                 <h2>Informasi Aset</h2>
@@ -150,11 +146,7 @@ onMounted(() => {
 .handover-page { min-height: 100vh; padding: 24px; background: #f3f4f6; color: #111827; }
 .screen-actions { display: flex; justify-content: flex-end; margin: 0 auto 16px; max-width: 850px; }
 .handover-document { box-sizing: border-box; max-width: 850px; min-height: 1100px; margin: 0 auto; padding: 48px; background: white; box-shadow: 0 1px 8px #0002; }
-.document-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 24px; padding-bottom: 20px; border-bottom: 3px solid #4c1d95; }
-.eyebrow { margin: 0 0 8px; color: #6b21a8; font-size: 10px; font-weight: 700; letter-spacing: .16em; }
-.document-header h1 { margin: 0; font-size: 20px; letter-spacing: .04em; }
-.document-date { display: grid; gap: 5px; text-align: right; font-size: 12px; }
-.document-date span, dt { color: #6b7280; }
+dt { color: #6b7280; }
 .asset-section, .movement-section, .remarks-section { margin-top: 28px; }
 .asset-section h2, .movement-section h2, .remarks-section h2 { margin: 0 0 14px; font-size: 13px; }
 .details-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 24px; margin: 0; }

@@ -11,6 +11,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class AssetIncidentEvent extends Model
 {
+    protected $table = 'trx_asset_incident_events';
+
     use HasBranchAccessScope;
     use HasDepartmentAccessScope;
     use HasUlids;

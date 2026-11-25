@@ -16,6 +16,7 @@ interface Category {
     id: string;
     code: string;
     name: string;
+    parent_id: string | null;
 }
 
 interface Type {
@@ -55,9 +56,9 @@ interface Product {
     code: string;
     name: string;
     description: string | null;
+    image_url: string | null;
     is_active: boolean;
     departments: Array<{ id: string; name: string }>;
-    branches: Array<{ id: string; name: string; code: string }>;
 }
 
 interface UnitOfMeasure {
@@ -71,8 +72,6 @@ interface Department {
     name: string;
 }
 
-interface Branch { id: string; name: string; code: string; }
-
 const props = defineProps<{
     product: Product;
     categories: Category[];
@@ -81,7 +80,6 @@ const props = defineProps<{
     models: Model[];
     unitsOfMeasure: UnitOfMeasure[];
     departments: Department[];
-    branches: Branch[];
 }>();
 
 const form = useForm({
@@ -95,9 +93,9 @@ const form = useForm({
     code: props.product.code,
     name: props.product.name,
     description: props.product.description ?? "",
+    image: null as File | null,
     is_active: props.product.is_active,
     department_ids: props.product.departments.map((department) => department.id),
-    branch_ids: props.product.branches.map((branch) => branch.id),
 });
 
 useMasterFieldFormatting(form);
@@ -109,9 +107,15 @@ const filteredTypes = computed(() =>
 );
 
 const filteredBrands = computed(() =>
-    props.brands.filter((brand) =>
-        brand.categories.some((category) => category.id === form.category_id),
-    ),
+    props.brands.filter((brand) => {
+        const category = props.categories.find((item) => item.id === form.category_id);
+        const rootCategoryId = category?.parent_id ?? category?.id;
+
+        return brand.categories.some((brandCategory) =>
+            brandCategory.id === form.category_id
+            || (brandCategory.parent_id === null && brandCategory.id === rootCategoryId),
+        );
+    }),
 );
 
 const filteredModels = computed(() =>
@@ -129,8 +133,13 @@ watch(
             form.type_id = "";
         }
 
-        const brandExists = props.brands.some(
-            (brand) => brand.id === form.brand_id && brand.categories.some((category) => category.id === value),
+        const category = props.categories.find((item) => item.id === value);
+        const rootCategoryId = category?.parent_id ?? category?.id;
+        const brandExists = props.brands.some((brand) =>
+            brand.id === form.brand_id && brand.categories.some((brandCategory) =>
+                brandCategory.id === value
+                || (brandCategory.parent_id === null && brandCategory.id === rootCategoryId),
+            ),
         );
         if (!value || !brandExists) {
             form.brand_id = "";
@@ -180,8 +189,16 @@ watch(
 );
 
 const submit = () => {
-    form.put(route("master.product.products.update", props.product.id));
+    form.transform((data) => ({ ...data, _method: "put" })).post(
+        route("master.product.products.update", props.product.id),
+        { forceFormData: true },
+    );
 };
+
+function selectImage(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    form.image = input.files?.[0] ?? null;
+}
 
 const cancel = () => {
     window.location.href = route("master.product.products.index");
@@ -198,23 +215,17 @@ const cancel = () => {
         @cancel="cancel"
     >
         <div class="grid grid-cols-1 gap-5 md:grid-cols-2">
-            <div class="md:col-span-2">
-                <label for="department_ids" class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Department pemilik <span class="text-red-500">*</span></label>
-                <select id="department_ids" v-model="form.department_ids" multiple class="min-h-28 w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm text-gray-900 outline-none focus:border-blue-500 dark:border-gray-700 dark:bg-gray-900 dark:text-white" required>
-                    <option v-for="department in departments" :key="department.id" :value="department.id">{{ department.name }}</option>
-                </select>
-                <p class="mt-1.5 text-xs text-gray-500 dark:text-gray-400">Pilih beberapa jika product memang digunakan bersama oleh beberapa department.</p>
+            <fieldset class="md:col-span-2">
+                <legend class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Department pemilik <span class="text-red-500">*</span></legend>
+                <div class="mt-2 grid max-h-56 grid-cols-1 gap-2 overflow-y-auto rounded-xl border border-gray-300 bg-white p-3 sm:grid-cols-2 dark:border-gray-700 dark:bg-gray-900">
+                    <label v-for="department in departments" :key="department.id" class="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-2 text-sm text-gray-700 hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-800">
+                        <input v-model="form.department_ids" type="checkbox" :value="department.id" class="size-4 rounded border-gray-300 text-brand-700 focus:ring-brand-700/20 dark:border-gray-600 dark:bg-gray-800" />
+                        <span>{{ department.name }}</span>
+                    </label>
+                </div>
+                <p class="mt-1.5 text-xs text-gray-500 dark:text-gray-400">Katalog produk berlaku untuk semua branch. Department menentukan unit yang dapat menggunakan produk ini.</p>
                 <p v-if="form.errors.department_ids" class="mt-1.5 text-sm text-red-600 dark:text-red-400">{{ form.errors.department_ids }}</p>
-            </div>
-
-            <div class="md:col-span-2">
-                <label for="branch_ids" class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Branch tersedia <span class="text-red-500">*</span></label>
-                <select id="branch_ids" v-model="form.branch_ids" multiple class="min-h-28 w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm text-gray-900 outline-none focus:border-blue-500 dark:border-gray-700 dark:bg-gray-900 dark:text-white" required>
-                    <option v-for="branch in branches" :key="branch.id" :value="branch.id">{{ branch.code }} · {{ branch.name }}</option>
-                </select>
-                <p class="mt-1.5 text-xs text-gray-500 dark:text-gray-400">Pilih branch tempat produk ini boleh digunakan.</p>
-                <p v-if="form.errors.branch_ids" class="mt-1.5 text-sm text-red-600 dark:text-red-400">{{ form.errors.branch_ids }}</p>
-            </div>
+            </fieldset>
 
             <div>
                 <label
@@ -312,6 +323,17 @@ const cancel = () => {
                 >
                     {{ form.errors.name }}
                 </p>
+            </div>
+
+            <div class="md:col-span-2">
+                <label for="image" class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Gambar produk <span class="font-normal text-gray-400">(Opsional)</span></label>
+                <div v-if="product.image_url" class="mb-3">
+                    <img :src="product.image_url" :alt="`Gambar ${product.name}`" class="h-32 w-32 rounded-xl border border-gray-200 object-cover dark:border-gray-700" />
+                </div>
+                <input id="image" type="file" accept="image/jpeg,image/png,image/webp" class="h-11 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 dark:border-gray-700 dark:bg-gray-900 dark:text-white" @change="selectImage" />
+                <p class="mt-1.5 text-xs text-gray-500 dark:text-gray-400">Format JPG, PNG, atau WebP. Maksimal 5 MB. Kosongkan jika tidak ingin mengganti gambar.</p>
+                <p v-if="form.image" class="mt-1 text-xs text-gray-600 dark:text-gray-300">{{ form.image.name }}</p>
+                <p v-if="form.errors.image" class="mt-1.5 text-sm text-red-600 dark:text-red-400">{{ form.errors.image }}</p>
             </div>
 
             <div>

@@ -268,13 +268,13 @@ class PurchaseRequestPageTest extends TestCase
             route('transaction.procurement.purchase-requests.show', $purchaseRequest),
         );
 
-        $this->assertDatabaseHas('purchase_requests', [
+        $this->assertDatabaseHas('trx_purchase_requests', [
             'id' => $purchaseRequest->id,
             'company_id' => $company->id,
             'department_id' => $department->id,
         ]);
 
-        $this->assertDatabaseHas('purchase_request_items', [
+        $this->assertDatabaseHas('trx_purchase_request_items', [
             'purchase_request_id' => $purchaseRequest->id,
             'delivery_address' => $branch->address,
             'estimated_unit_price' => 2000000,
@@ -364,11 +364,11 @@ class PurchaseRequestPageTest extends TestCase
         $response->assertRedirect(
             route('transaction.procurement.purchase-requests.show', $purchaseRequest),
         );
-        $this->assertDatabaseHas('purchase_requests', [
+        $this->assertDatabaseHas('trx_purchase_requests', [
             'id' => $purchaseRequest->id,
             'purpose' => 'Updated purpose',
         ]);
-        $this->assertDatabaseHas('purchase_request_items', [
+        $this->assertDatabaseHas('trx_purchase_request_items', [
             'purchase_request_id' => $purchaseRequest->id,
             'description' => 'Updated description',
             'quantity' => 2,
@@ -502,7 +502,7 @@ class PurchaseRequestPageTest extends TestCase
             ->firstOrFail();
 
         $this->assertSame($workflow->id, $approvalRequest->approval_workflow_id);
-        $this->assertDatabaseHas('purchase_requests', [
+        $this->assertDatabaseHas('trx_purchase_requests', [
             'id' => $purchaseRequest->id,
             'status' => 'SUBMITTED',
         ]);
@@ -523,7 +523,7 @@ class PurchaseRequestPageTest extends TestCase
             ],
         )->assertRedirect(route('transaction.procurement.purchase-requests.show', $purchaseRequest));
 
-        $this->assertDatabaseHas('purchase_requests', [
+        $this->assertDatabaseHas('trx_purchase_requests', [
             'id' => $purchaseRequest->id,
             'status' => 'APPROVED',
         ]);
@@ -554,7 +554,7 @@ class PurchaseRequestPageTest extends TestCase
             ->get(route('transaction.procurement.purchase-requests.approval-document', $purchaseRequest))
             ->assertOk();
 
-        $this->assertDatabaseHas('purchase_requests', [
+        $this->assertDatabaseHas('trx_purchase_requests', [
             'id' => $purchaseRequest->id,
             'status' => 'APPROVED',
         ]);
@@ -616,7 +616,7 @@ class PurchaseRequestPageTest extends TestCase
             route('transaction.procurement.purchase-requests.show', $purchaseRequest),
         );
         $response->assertSessionHasNoErrors();
-        $this->assertDatabaseHas('purchase_requests', [
+        $this->assertDatabaseHas('trx_purchase_requests', [
             'id' => $purchaseRequest->id,
             'number' => 'SELF-DEPT/001',
             'status' => 'SUBMITTED',
@@ -705,7 +705,7 @@ class PurchaseRequestPageTest extends TestCase
             ],
         )->assertForbidden();
 
-        $this->assertDatabaseHas('purchase_requests', [
+        $this->assertDatabaseHas('trx_purchase_requests', [
             'id' => $purchaseRequest->id,
             'status' => 'SUBMITTED',
         ]);
@@ -790,7 +790,7 @@ class PurchaseRequestPageTest extends TestCase
             ],
         )->assertRedirect();
 
-        $this->assertDatabaseHas('purchase_requests', [
+        $this->assertDatabaseHas('trx_purchase_requests', [
             'id' => $purchaseRequest->id,
             'status' => 'APPROVED',
         ]);
@@ -833,7 +833,7 @@ class PurchaseRequestPageTest extends TestCase
             ->delete(route('transaction.procurement.purchase-requests.destroy', $purchaseRequest))
             ->assertRedirect(route('transaction.procurement.purchase-requests.index'));
 
-        $this->assertDatabaseMissing('purchase_requests', [
+        $this->assertDatabaseMissing('trx_purchase_requests', [
             'id' => $purchaseRequest->id,
         ]);
     }
@@ -858,7 +858,7 @@ class PurchaseRequestPageTest extends TestCase
             ->post(route('transaction.procurement.purchase-requests.cancel', $purchaseRequest))
             ->assertRedirect(route('transaction.procurement.purchase-requests.index'));
 
-        $this->assertDatabaseHas('purchase_requests', [
+        $this->assertDatabaseHas('trx_purchase_requests', [
             'id' => $purchaseRequest->id,
             'status' => 'CANCELLED',
         ]);
@@ -903,7 +903,7 @@ class PurchaseRequestPageTest extends TestCase
             ->post(route('transaction.procurement.purchase-requests.cancel', $purchaseRequest))
             ->assertForbidden();
 
-        $this->assertDatabaseHas('purchase_requests', [
+        $this->assertDatabaseHas('trx_purchase_requests', [
             'id' => $purchaseRequest->id,
             'status' => 'SUBMITTED',
         ]);

@@ -2,13 +2,16 @@
 
 namespace App\Http\Controllers\Master\Product;
 
+use App\Enums\NumberingModuleCode;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Master\Product\BrandRequest;
 use App\Models\Master\Product\Brand;
 use App\Models\Master\Product\Category;
+use App\Services\NumberingService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -19,7 +22,7 @@ class BrandController extends Controller
         $search = $request->string('search')->trim()->toString();
 
         $brands = Brand::query()
-            ->with('categories:id,code,name')
+            ->with('categories:id,code,name,parent_id')
             ->when($search !== '', function ($query) use ($search) {
                 $query->where(function ($query) use ($search) {
                     $query
@@ -50,17 +53,36 @@ class BrandController extends Controller
             [
                 'categories' => Category::query()
                     ->where('is_active', true)
+                    ->whereNull('parent_id')
+                    ->withCount(['children' => fn ($query) => $query->where('is_active', true)])
                     ->orderBy('name')
-                    ->get(['id', 'code', 'name']),
+                    ->get(['id', 'code', 'name', 'parent_id']),
             ],
         );
     }
 
-    public function store(BrandRequest $request): RedirectResponse
+    public function store(BrandRequest $request, NumberingService $numberingService): RedirectResponse
     {
         $data = $request->validated();
         $categoryIds = $data['category_ids'];
         unset($data['category_ids']);
+
+        if (! $numberingService->hasActiveDocument(NumberingModuleCode::ProductBrand)) {
+            throw ValidationException::withMessages([
+                'code' => 'Configure an active PRODUCT_BRAND numbering rule before creating a brand.',
+            ]);
+        }
+
+        $data['code'] = mb_strtoupper(
+            $numberingService->generate(NumberingModuleCode::ProductBrand),
+            'UTF-8',
+        );
+
+        if (Brand::withTrashed()->where('code', $data['code'])->exists()) {
+            throw ValidationException::withMessages([
+                'code' => 'Generated brand code already exists. Update the numbering sequence start.',
+            ]);
+        }
 
         DB::transaction(function () use ($data, $categoryIds): void {
             $brand = Brand::create($data);
@@ -73,7 +95,14 @@ class BrandController extends Controller
 
     public function edit(Brand $brand): Response
     {
-        $brand->load('categories:id,code,name');
+        $brand->load('categories.parent:id,code,name');
+        $brand->setRelation(
+            'categories',
+            $brand->categories
+                ->map(fn (Category $category): Category => $category->parent ?? $category)
+                ->unique('id')
+                ->values(),
+        );
 
         return Inertia::render(
             'Master/Product/Brands/Edit',
@@ -81,8 +110,10 @@ class BrandController extends Controller
                 'brand' => $brand,
                 'categories' => Category::query()
                     ->where('is_active', true)
+                    ->whereNull('parent_id')
+                    ->withCount(['children' => fn ($query) => $query->where('is_active', true)])
                     ->orderBy('name')
-                    ->get(['id', 'code', 'name']),
+                    ->get(['id', 'code', 'name', 'parent_id']),
             ],
         );
     }

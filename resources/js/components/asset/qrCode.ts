@@ -2,15 +2,15 @@ type QrVersion = {
     version: number
     dataCodewords: number
     errorCodewords: number
-    alignmentCenter: number | null
+    alignmentCenters: number[]
 }
 
 const versions: QrVersion[] = [
-    { version: 1, dataCodewords: 19, errorCodewords: 7, alignmentCenter: null },
-    { version: 2, dataCodewords: 34, errorCodewords: 10, alignmentCenter: 18 },
-    { version: 3, dataCodewords: 55, errorCodewords: 15, alignmentCenter: 22 },
-    { version: 4, dataCodewords: 80, errorCodewords: 20, alignmentCenter: 26 },
-    { version: 5, dataCodewords: 108, errorCodewords: 26, alignmentCenter: 30 },
+    { version: 1, dataCodewords: 19, errorCodewords: 7, alignmentCenters: [] },
+    { version: 2, dataCodewords: 34, errorCodewords: 10, alignmentCenters: [18] },
+    { version: 3, dataCodewords: 55, errorCodewords: 15, alignmentCenters: [22] },
+    { version: 4, dataCodewords: 80, errorCodewords: 20, alignmentCenters: [26] },
+    { version: 5, dataCodewords: 108, errorCodewords: 26, alignmentCenters: [30] },
 ]
 
 function appendBits(bits: number[], value: number, length: number): void {
@@ -96,10 +96,10 @@ function formatBits(mask: number): number {
     return ((data << 10) | remainder) ^ 0x5412
 }
 
-export function createAssetQrCode(value: string): boolean[][] {
+export function createAssetQrCode(value: string, minimumVersion = 1): boolean[][] {
     const selected = versions
         .map((configuration) => ({ configuration, data: makeDataCodewords(value, configuration.dataCodewords) }))
-        .find((candidate) => candidate.data !== null)
+        .find((candidate) => candidate.configuration.version >= minimumVersion && candidate.data !== null)
 
     if (!selected?.data) {
         throw new Error('Kode aset terlalu panjang untuk QR code yang didukung.')
@@ -137,11 +137,20 @@ export function createAssetQrCode(value: string): boolean[][] {
     drawFinder(size - 7, 0)
     drawFinder(0, size - 7)
 
-    if (configuration.alignmentCenter !== null) {
-        const center = configuration.alignmentCenter
-        for (let dy = -2; dy <= 2; dy++) {
-            for (let dx = -2; dx <= 2; dx++) {
-                setFunction(center + dx, center + dy, Math.max(Math.abs(dx), Math.abs(dy)) !== 1)
+    for (const centerX of [6, ...configuration.alignmentCenters]) {
+        for (const centerY of [6, ...configuration.alignmentCenters]) {
+            const overlapsFinder = (centerX === 6 && centerY === 6)
+                || (centerX === size - 7 && centerY === 6)
+                || (centerX === 6 && centerY === size - 7)
+
+            if (overlapsFinder) {
+                continue
+            }
+
+            for (let dy = -2; dy <= 2; dy++) {
+                for (let dx = -2; dx <= 2; dx++) {
+                    setFunction(centerX + dx, centerY + dy, Math.max(Math.abs(dx), Math.abs(dy)) !== 1)
+                }
             }
         }
     }

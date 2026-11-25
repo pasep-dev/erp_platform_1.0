@@ -74,7 +74,7 @@ class Asset extends Model
         'DAMAGED' => 'Rusak',
     ];
 
-    protected $table = 'assets';
+    protected $table = 'trx_assets';
 
     protected $fillable = [
         'number',
@@ -119,7 +119,7 @@ class Asset extends Model
 
     public function product(): BelongsTo
     {
-        return $this->belongsTo(Product::class);
+        return $this->belongsTo(Product::class)->withTrashed();
     }
 
     public function category(): BelongsTo

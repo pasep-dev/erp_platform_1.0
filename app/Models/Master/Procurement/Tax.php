@@ -11,12 +11,13 @@ class Tax extends Model
     use HasUlids;
     use SoftDeletes;
 
-    protected $table = 'mst_taxes';
+    protected $table = 'mst_prc_taxes';
 
     protected $fillable = [
         'code',
         'name',
         'rate',
+        'category',
         'description',
         'is_active',
     ];

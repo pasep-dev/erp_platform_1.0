@@ -57,7 +57,16 @@ class AssetRegistrationController extends Controller
         $products = Product::query()
             ->where('group', 'ASSET')
             ->where('is_active', true)
-            ->with(['category:id,name', 'type:id,name', 'brand:id,name', 'model:id,name', 'departments:id'])
+            ->whereHas('departments', fn ($query) => $query->whereIn('mst_org_departments.id', $accessibleDepartmentIds))
+            ->with([
+                'category:id,name',
+                'type:id,name',
+                'brand:id,name',
+                'model:id,name',
+                'departments' => fn ($query) => $query
+                    ->whereIn('mst_org_departments.id', $accessibleDepartmentIds)
+                    ->select('mst_org_departments.id'),
+            ])
             ->orderBy('name')
             ->get(['id', 'category_id', 'type_id', 'brand_id', 'model_id', 'code', 'name'])
             ->map(fn (Product $product): array => [

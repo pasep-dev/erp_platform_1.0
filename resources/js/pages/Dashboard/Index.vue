@@ -12,6 +12,7 @@ import {
     UserCog,
     Wrench,
 } from 'lucide-vue-next'
+import { route } from 'ziggy-js'
 import AppLayout from '@/layout/AppLayout.vue'
 
 defineOptions({
@@ -59,6 +60,11 @@ interface PipelineItem {
     label: string
     value: number
 }
+interface DepartmentOption {
+    id: string
+    code: string
+    name: string
+}
 
 const props = defineProps<{
     stats: Record<StatKey, number>
@@ -68,6 +74,8 @@ const props = defineProps<{
     activities: Activity[]
     assetStatus: AssetStatus[]
     pipeline: PipelineItem[]
+    departments: DepartmentOption[]
+    selectedDepartmentId: string | null
 }>()
 
 const page = usePage()
@@ -88,6 +96,9 @@ const roles = computed<string[]>(() => {
 })
 
 const canSee = (module: ModuleKey): boolean => props.access[module]
+const selectedDepartment = computed(() =>
+    props.departments.find((department) => department.id === props.selectedDepartmentId) ?? null,
+)
 
 /* ------------------------------------------------------------------ */
 /* Helpers                                                             */
@@ -119,10 +130,10 @@ const panel =
 const link =
     'text-sm font-medium text-brand-700 hover:underline dark:text-brand-400'
 
-const s = props.stats
-const approvals = props.approvals
+const s = computed(() => props.stats)
+const approvals = computed(() => props.approvals)
 const alerts = computed(() => props.alerts.filter((a) => canSee(a.module)))
-const activities = props.activities
+const activities = computed(() => props.activities)
 
 /* ------------------------------------------------------------------ */
 /* Configuration                                                       */
@@ -220,10 +231,10 @@ const modules: {
 ]
 const visibleModules = computed(() => modules.filter((m) => canSee(m.key)))
 
-const assetStatus = props.assetStatus
-const assetTotal = computed(() => assetStatus.reduce((sum, item) => sum + item.value, 0))
-const pipeline = props.pipeline
-const pipelineMax = computed(() => Math.max(...pipeline.map((item) => item.value), 1))
+const assetStatus = computed(() => props.assetStatus)
+const assetTotal = computed(() => assetStatus.value.reduce((sum, item) => sum + item.value, 0))
+const pipeline = computed(() => props.pipeline)
+const pipelineMax = computed(() => Math.max(...pipeline.value.map((item) => item.value), 1))
 
 const dot: Record<Severity, string> = {
     critical: 'bg-rose-500',
@@ -271,6 +282,34 @@ const dot: Record<Severity, string> = {
                 </Link>
             </div>
         </header>
+
+        <nav
+            v-if="props.departments.length > 1"
+            aria-label="Filter dashboard berdasarkan department"
+            role="tablist"
+            class="flex flex-wrap gap-2 border-b border-gray-200 pb-3 dark:border-gray-800"
+        >
+            <Link
+                v-for="department in props.departments"
+                :key="department.id"
+                :href="route('dashboard', { department_id: department.id })"
+                role="tab"
+                :aria-selected="department.id === props.selectedDepartmentId"
+                class="rounded-lg px-4 py-2 text-sm font-medium transition"
+                :class="department.id === props.selectedDepartmentId
+                    ? 'bg-brand-700 text-white'
+                    : 'bg-white text-gray-600 hover:bg-gray-100 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-800'"
+            >
+                {{ department.code }} · {{ department.name }}
+            </Link>
+        </nav>
+        <div
+            v-else-if="selectedDepartment"
+            class="inline-flex items-center gap-2 rounded-lg bg-brand-50 px-3 py-2 text-sm text-brand-800 dark:bg-brand-500/10 dark:text-brand-200"
+        >
+            <span class="font-medium">Department:</span>
+            <span>{{ selectedDepartment.code }} · {{ selectedDepartment.name }}</span>
+        </div>
 
         <!-- Key figures -->
         <section v-if="statCells.length" class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">

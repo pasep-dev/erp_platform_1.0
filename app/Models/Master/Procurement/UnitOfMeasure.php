@@ -11,7 +11,7 @@ class UnitOfMeasure extends Model
     use HasUlids;
     use SoftDeletes;
 
-    protected $table = 'mst_units_of_measure';
+    protected $table = 'mst_prc_uom';
 
     protected $fillable = [
         'code',

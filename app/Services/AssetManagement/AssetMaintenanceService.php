@@ -2,7 +2,7 @@
 
 namespace App\Services\AssetManagement;
 
-use App\Models\NumberingDocument;
+use App\Enums\NumberingModuleCode;
 use App\Models\Transaction\AssetManagement\Asset;
 use App\Models\Transaction\AssetManagement\AssetMaintenanceRecord;
 use App\Models\User;
@@ -22,6 +22,7 @@ class AssetMaintenanceService
     {
         return DB::transaction(function () use ($data, $actor): AssetMaintenanceRecord {
             $asset = Asset::query()->whereKey($data['asset_id'])->lockForUpdate()->firstOrFail();
+            $asset->load(['company:id,code', 'department:id,code', 'branch:id,code', 'location:id,code', 'type:id,code', 'category:id,code', 'product:id,code']);
             $components = $data['components'] ?? [];
             unset($data['components']);
 
@@ -58,7 +59,17 @@ class AssetMaintenanceService
             $maintenance = AssetMaintenanceRecord::query()->create([
                 ...$data,
                 'number' => $this->numberingService->generate(
-                    NumberingDocument::CODE_ASSET_MAINTENANCE,
+                    NumberingModuleCode::AssetMaintenance,
+                    [
+                        'company' => $asset->company?->code,
+                        'department' => $asset->department?->code,
+                        'branch' => $asset->branch?->code,
+                        'location' => $asset->location?->code,
+                        'asset_type' => $asset->type?->code,
+                        'category' => $asset->category?->code,
+                        'product' => $asset->product?->code,
+                        'document_type' => 'ASSET_MAINTENANCE',
+                    ],
                 ),
                 'status' => AssetMaintenanceRecord::STATUS_REQUESTED,
                 'requested_by' => $actor->id,

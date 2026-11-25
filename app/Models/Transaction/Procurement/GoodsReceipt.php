@@ -47,7 +47,7 @@ class GoodsReceipt extends Model
 
     public const SOURCE_PURCHASE_REQUEST = 'PURCHASE_REQUEST';
 
-    protected $table = 'goods_receipts';
+    protected $table = 'trx_goods_receipts';
 
     protected $fillable = [
         'number',

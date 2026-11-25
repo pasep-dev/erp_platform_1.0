@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\NumberingModuleCode;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -11,21 +12,25 @@ class NumberingDocument extends Model
 {
     use HasUlids;
 
-    public const CODE_VENDOR = 'VENDOR';
+    public const CODE_VENDOR = NumberingModuleCode::Vendor->value;
 
-    public const CODE_VENDOR_TYPE = 'VENDOR_TYPE';
+    public const CODE_VENDOR_TYPE = NumberingModuleCode::VendorType->value;
 
-    public const CODE_PRODUCT = 'PRODUCT';
+    public const CODE_PRODUCT = NumberingModuleCode::Product->value;
 
-    public const CODE_ASSET = 'ASSET';
+    public const CODE_PRODUCT_TYPE = NumberingModuleCode::ProductType->value;
 
-    public const CODE_ASSET_MAINTENANCE = 'ASSET_MAINTENANCE';
+    public const CODE_PRODUCT_BRAND = NumberingModuleCode::ProductBrand->value;
 
-    public const CODE_PURCHASE_REQUEST = 'PURCHASE_REQUEST';
+    public const CODE_ASSET = NumberingModuleCode::Asset->value;
 
-    public const CODE_PURCHASE_ORDER = 'PURCHASE_ORDER';
+    public const CODE_ASSET_MAINTENANCE = NumberingModuleCode::AssetMaintenance->value;
 
-    public const CODE_GOODS_RECEIPT = 'GOODS_RECEIPT';
+    public const CODE_PURCHASE_REQUEST = NumberingModuleCode::PurchaseRequest->value;
+
+    public const CODE_PURCHASE_ORDER = NumberingModuleCode::PurchaseOrder->value;
+
+    public const CODE_GOODS_RECEIPT = NumberingModuleCode::GoodsReceipt->value;
 
     public const SUPPORTED_PLACEHOLDERS = [
         'YYYY',
@@ -34,24 +39,54 @@ class NumberingDocument extends Model
         'DD',
         'SEQ',
         'COMPANY',
+        'SOURCE_COMPANY',
+        'TARGET_COMPANY',
         'ASSET_TYPE',
+        'CATEGORY',
+        'PRODUCT',
+        'VENDOR',
         'BRANCH',
+        'SOURCE_BRANCH',
+        'TARGET_BRANCH',
         'DOCUMENT_TYPE',
+        'EVENT_TYPE',
         'DEPARTMENT',
+        'SOURCE_DEPARTMENT',
+        'TARGET_DEPARTMENT',
+        'LOCATION',
+        'SOURCE_LOCATION',
+        'TARGET_LOCATION',
+        'DIRECTION',
     ];
 
     public const SCOPE_PLACEHOLDERS = [
         'COMPANY',
+        'SOURCE_COMPANY',
+        'TARGET_COMPANY',
         'ASSET_TYPE',
+        'CATEGORY',
+        'PRODUCT',
+        'VENDOR',
         'BRANCH',
+        'SOURCE_BRANCH',
+        'TARGET_BRANCH',
         'DOCUMENT_TYPE',
+        'EVENT_TYPE',
         'DEPARTMENT',
+        'SOURCE_DEPARTMENT',
+        'TARGET_DEPARTMENT',
+        'LOCATION',
+        'SOURCE_LOCATION',
+        'TARGET_LOCATION',
+        'DIRECTION',
     ];
 
     public const GENERATED_MASTER_CODES = [
         self::CODE_VENDOR,
         self::CODE_VENDOR_TYPE,
         self::CODE_PRODUCT,
+        self::CODE_PRODUCT_TYPE,
+        self::CODE_PRODUCT_BRAND,
     ];
 
     protected $fillable = [

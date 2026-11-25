@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Enums\NumberingModuleCode;
 use App\Models\NumberingDocument;
 use App\Models\NumberingModule;
 use App\Models\NumberingSequence;
@@ -42,7 +43,7 @@ class NumberingServiceTest extends TestCase
 
         $this->assertSame(
             'CITRA-LTP001JKT',
-            $service->generate('ASSET', [
+            $service->generate(NumberingModuleCode::Asset, [
                 'company' => 'CITRA',
                 'asset_type' => 'LTP',
                 'branch' => 'JKT',
@@ -51,7 +52,7 @@ class NumberingServiceTest extends TestCase
 
         $this->assertSame(
             'CITRA-LTP002JKT',
-            $service->generate('ASSET', [
+            $service->generate(NumberingModuleCode::Asset, [
                 'company' => 'CITRA',
                 'asset_type' => 'LTP',
                 'branch' => 'JKT',
@@ -60,7 +61,7 @@ class NumberingServiceTest extends TestCase
 
         $this->assertSame(
             'CITRA-MON001JKT',
-            $service->generate('ASSET', [
+            $service->generate(NumberingModuleCode::Asset, [
                 'company' => 'CITRA',
                 'asset_type' => 'MON',
                 'branch' => 'JKT',
@@ -69,7 +70,7 @@ class NumberingServiceTest extends TestCase
 
         $this->assertSame(
             'CITRA-LTP001BDG',
-            $service->generate('ASSET', [
+            $service->generate(NumberingModuleCode::Asset, [
                 'company' => 'CITRA',
                 'asset_type' => 'LTP',
                 'branch' => 'BDG',
@@ -84,7 +85,7 @@ class NumberingServiceTest extends TestCase
 
         $this->assertSame(
             "CAA/PR/IT/{$year}/001",
-            $service->generate('PURCHASE_REQUEST', [
+            $service->generate(NumberingModuleCode::PurchaseRequest, [
                 'company' => 'CAA',
                 'document_type' => 'PR',
                 'department' => 'IT',
@@ -93,7 +94,7 @@ class NumberingServiceTest extends TestCase
 
         $this->assertSame(
             "CAA/PR/IT/{$year}/002",
-            $service->generate('PURCHASE_REQUEST', [
+            $service->generate(NumberingModuleCode::PurchaseRequest, [
                 'company' => 'CAA',
                 'document_type' => 'PR',
                 'department' => 'IT',
@@ -101,17 +102,46 @@ class NumberingServiceTest extends TestCase
         );
     }
 
+    public function test_generates_inventory_number_from_multi_company_branch_and_department_context(): void
+    {
+        NumberingDocument::query()
+            ->where('code', NumberingModuleCode::InventoryIssue->value)
+            ->update([
+                'pattern' => 'GI/{COMPANY}/{BRANCH}/{DEPARTMENT}/{YYYY}/{SEQ}',
+                'sequence_length' => 3,
+                'reset_period' => 'yearly',
+            ]);
+
+        $this->assertSame(
+            'GI/CAA/SBY/IT/'.now()->format('Y').'/001',
+            app(NumberingService::class)->generate(
+                NumberingModuleCode::InventoryIssue,
+                [
+                    'company' => 'CAA',
+                    'branch' => 'SBY',
+                    'department' => 'IT',
+                    'document_type' => 'ISSUE',
+                    'direction' => 'OUT',
+                    'source_company' => 'CAA',
+                    'source_branch' => 'SBY',
+                    'source_department' => 'IT',
+                    'source_location' => 'WH-SBY',
+                ],
+            ),
+        );
+    }
+
     public function test_keeps_sequences_separate_for_different_scopes(): void
     {
         $service = app(NumberingService::class);
 
-        $service->generate('ASSET', [
+        $service->generate(NumberingModuleCode::Asset, [
             'company' => 'CITRA',
             'asset_type' => 'LTP',
             'branch' => 'JKT',
         ]);
 
-        $service->generate('ASSET', [
+        $service->generate(NumberingModuleCode::Asset, [
             'company' => 'CITRA',
             'asset_type' => 'MON',
             'branch' => 'JKT',
@@ -142,23 +172,37 @@ class NumberingServiceTest extends TestCase
 
     public function test_rejects_an_unsupported_placeholder(): void
     {
-        $this->createNumberingModule('INVALID');
-
-        NumberingDocument::create([
-            'code' => 'INVALID',
-            'name' => 'Invalid Rule',
-            'pattern' => '{COMPANY}/{UNKNOWN}/{SEQ}',
-            'sequence_length' => 3,
-            'reset_period' => 'never',
-            'is_active' => true,
-        ]);
+        NumberingDocument::query()
+            ->where('code', 'ASSET')
+            ->update(['pattern' => '{COMPANY}/{UNKNOWN}/{SEQ}']);
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage(
             'Unsupported numbering placeholder',
         );
 
-        app(NumberingService::class)->generate('INVALID', [
+        app(NumberingService::class)->generate(NumberingModuleCode::Asset, [
+            'company' => 'CAA',
+        ]);
+    }
+
+    public function test_rejects_a_context_placeholder_not_supported_by_the_module(): void
+    {
+        NumberingDocument::query()->create([
+            'code' => NumberingModuleCode::Product->value,
+            'name' => 'Product Master',
+            'pattern' => '{COMPANY}-{SEQ}',
+            'sequence_length' => 4,
+            'reset_period' => 'never',
+            'is_active' => true,
+        ]);
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage(
+            'Numbering placeholder [COMPANY] is unavailable for module [PRODUCT].',
+        );
+
+        app(NumberingService::class)->generate(NumberingModuleCode::Product, [
             'company' => 'CAA',
         ]);
     }
@@ -170,7 +214,7 @@ class NumberingServiceTest extends TestCase
             'Missing numbering parameter [asset_type]',
         );
 
-        app(NumberingService::class)->generate('ASSET', [
+        app(NumberingService::class)->generate(NumberingModuleCode::Asset, [
             'company' => 'CITRA',
             'branch' => 'JKT',
         ]);
@@ -187,7 +231,7 @@ class NumberingServiceTest extends TestCase
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('not found or inactive');
 
-        app(NumberingService::class)->generate('ASSET', [
+        app(NumberingService::class)->generate(NumberingModuleCode::Asset, [
             'company' => 'CITRA',
             'asset_type' => 'LTP',
             'branch' => 'JKT',
@@ -203,7 +247,7 @@ class NumberingServiceTest extends TestCase
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('not found or inactive');
 
-        app(NumberingService::class)->generate('ASSET', [
+        app(NumberingService::class)->generate(NumberingModuleCode::Asset, [
             'company' => 'CITRA',
             'asset_type' => 'LTP',
             'branch' => 'JKT',
@@ -220,7 +264,7 @@ class NumberingServiceTest extends TestCase
 
         $this->assertSame(
             'CITRA-LTP000001JKT',
-            app(NumberingService::class)->generate('ASSET', [
+            app(NumberingService::class)->generate(NumberingModuleCode::Asset, [
                 'company' => 'CITRA',
                 'asset_type' => 'LTP',
                 'branch' => 'JKT',
@@ -240,7 +284,7 @@ class NumberingServiceTest extends TestCase
 
         $this->assertSame(
             "CAA/PR/IT/{$year}/008",
-            app(NumberingService::class)->generate('PURCHASE_REQUEST', [
+            app(NumberingService::class)->generate(NumberingModuleCode::PurchaseRequest, [
                 'company' => 'CAA',
                 'document_type' => 'PR',
                 'department' => 'IT',
@@ -250,21 +294,14 @@ class NumberingServiceTest extends TestCase
 
     public function test_rejects_a_numbering_rule_without_sequence_placeholder(): void
     {
-        $this->createNumberingModule('NO_SEQUENCE');
-
-        NumberingDocument::create([
-            'code' => 'NO_SEQUENCE',
-            'name' => 'No Sequence Rule',
-            'pattern' => '{COMPANY}/{BRANCH}',
-            'sequence_length' => 3,
-            'reset_period' => 'never',
-            'is_active' => true,
-        ]);
+        NumberingDocument::query()
+            ->where('code', 'ASSET')
+            ->update(['pattern' => '{COMPANY}/{BRANCH}']);
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('must contain {SEQ}');
 
-        app(NumberingService::class)->generate('NO_SEQUENCE', [
+        app(NumberingService::class)->generate(NumberingModuleCode::Asset, [
             'company' => 'CAA',
             'branch' => 'JKT',
         ]);
@@ -272,56 +309,25 @@ class NumberingServiceTest extends TestCase
 
     public function test_rejects_an_empty_numbering_pattern(): void
     {
-        $this->createNumberingModule('EMPTY_PATTERN');
-
-        NumberingDocument::create([
-            'code' => 'EMPTY_PATTERN',
-            'name' => 'Empty Pattern Rule',
-            'pattern' => '',
-            'sequence_length' => 3,
-            'reset_period' => 'never',
-            'is_active' => true,
-        ]);
+        NumberingDocument::query()
+            ->where('code', 'ASSET')
+            ->update(['pattern' => '']);
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('empty pattern');
 
-        app(NumberingService::class)->generate('EMPTY_PATTERN', [
-            'company' => 'CAA',
-        ]);
+        app(NumberingService::class)->generate(NumberingModuleCode::Asset);
     }
 
     public function test_rejects_an_invalid_sequence_length(): void
     {
-        $this->createNumberingModule('INVALID_LENGTH');
-
-        NumberingDocument::create([
-            'code' => 'INVALID_LENGTH',
-            'name' => 'Invalid Length Rule',
-            'pattern' => '{COMPANY}/{SEQ}',
-            'sequence_length' => 0,
-            'reset_period' => 'never',
-            'is_active' => true,
-        ]);
+        NumberingDocument::query()
+            ->where('code', 'ASSET')
+            ->update(['sequence_length' => 0]);
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('invalid sequence length');
 
-        app(NumberingService::class)->generate('INVALID_LENGTH', [
-            'company' => 'CAA',
-        ]);
-    }
-
-    private function createNumberingModule(string $code): NumberingModule
-    {
-        return NumberingModule::query()->create([
-            'code' => $code,
-            'name' => $code,
-            'category' => 'Testing',
-            'default_pattern' => '{SEQ}',
-            'sequence_length' => 3,
-            'reset_period' => 'never',
-            'is_active' => true,
-        ]);
+        app(NumberingService::class)->generate(NumberingModuleCode::Asset);
     }
 }

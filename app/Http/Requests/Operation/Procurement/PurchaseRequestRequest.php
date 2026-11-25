@@ -112,7 +112,7 @@ class PurchaseRequestRequest extends FormRequest
                 'required',
                 'string',
                 'size:26',
-                Rule::exists('mst_units_of_measure', 'id')
+                Rule::exists('mst_prc_uom', 'id')
                     ->whereNull('deleted_at')
                     ->where('is_active', true),
             ],

@@ -23,9 +23,10 @@ class UserAccountController extends Controller
     {
         $filters = $request->validate([
             'search' => ['nullable', 'string', 'max:100'],
-            'is_active' => ['nullable', Rule::in(['0', '1'])],
+            'is_active' => ['nullable', Rule::in(['0', '1', 'ALL'])],
             'per_page' => ['nullable', Rule::in([5, 15, 25, 50, 100])],
         ]);
+        $activeFilter = $filters['is_active'] ?? '1';
 
         $users = User::query()
             ->when(! $branchAccess->hasGlobalAccess($request->user()), function ($query) use ($branchAccess, $request): void {
@@ -62,8 +63,8 @@ class UserAccountController extends Controller
                 });
             })
             ->when(
-                isset($filters['is_active']),
-                fn ($query) => $query->where('is_active', $filters['is_active'] === '1'),
+                $activeFilter !== 'ALL',
+                fn ($query) => $query->where('is_active', $activeFilter === '1'),
             )
             ->orderBy('name')
             ->orderBy('id')
@@ -80,7 +81,7 @@ class UserAccountController extends Controller
                 ->get(['id', 'name']),
             'filters' => [
                 'search' => $filters['search'] ?? '',
-                'is_active' => $filters['is_active'] ?? 'ALL',
+                'is_active' => $activeFilter,
                 'per_page' => (int) ($filters['per_page'] ?? 15),
             ],
             'can' => [

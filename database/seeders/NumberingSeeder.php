@@ -13,7 +13,7 @@ class NumberingSeeder extends Seeder
             [
                 'code' => NumberingDocument::CODE_ASSET,
                 'name' => 'Asset Number',
-                'pattern' => '{COMPANY}-{ASSET_TYPE}{SEQ}{BRANCH}',
+                'pattern' => '{COMPANY}-{ASSET_TYPE}-{DEPARTMENT}{SEQ}{BRANCH}',
                 'sequence_length' => 3,
                 'reset_period' => 'never',
                 'is_active' => true,

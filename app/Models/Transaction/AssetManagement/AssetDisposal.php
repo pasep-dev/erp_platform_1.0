@@ -11,6 +11,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class AssetDisposal extends Model
 {
+    protected $table = 'trx_asset_disposals';
+
     use HasBranchAccessScope;
     use HasDepartmentAccessScope;
     use HasUlids;

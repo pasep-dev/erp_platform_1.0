@@ -44,7 +44,7 @@ class Department extends Model
 
     public function products(): BelongsToMany
     {
-        return $this->belongsToMany(Product::class, 'product_department')
+        return $this->belongsToMany(Product::class, 'mst_product_departments')
             ->withTimestamps();
     }
 }

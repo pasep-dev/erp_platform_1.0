@@ -18,7 +18,7 @@ class GoodsReceiptInventoryObserver
             return;
         }
 
-        if (! Schema::hasTable('inventory_receipt_integrations')) {
+        if (! Schema::hasTable('trx_inventory_receipt_integrations')) {
             return;
         }
 

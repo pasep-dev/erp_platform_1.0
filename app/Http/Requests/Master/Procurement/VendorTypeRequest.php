@@ -25,7 +25,7 @@ class VendorTypeRequest extends FormRequest
                 'string',
                 'max:50',
                 'alpha_dash',
-                Rule::unique('mst_vendor_types', 'code')
+                Rule::unique('mst_prc_vendor_types', 'code')
                     ->ignore($vendorTypeId)
                     ->whereNull('deleted_at'),
             ],

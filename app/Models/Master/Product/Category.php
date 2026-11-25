@@ -14,7 +14,7 @@ class Category extends Model
     use HasUlids;
     use SoftDeletes;
 
-    protected $table = 'mst_asset_categories';
+    protected $table = 'mst_product_categories';
 
     protected $fillable = [
         'parent_id',
@@ -48,6 +48,6 @@ class Category extends Model
 
     public function brands(): BelongsToMany
     {
-        return $this->belongsToMany(Brand::class, 'mst_asset_brand_categories', 'category_id', 'brand_id');
+        return $this->belongsToMany(Brand::class, 'mst_product_brand_categories', 'category_id', 'brand_id');
     }
 }

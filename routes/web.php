@@ -26,6 +26,7 @@ use App\Http\Controllers\Master\Product\LicenseTypeController;
 use App\Http\Controllers\Master\Product\ModelController;
 use App\Http\Controllers\Master\Product\ProductController;
 use App\Http\Controllers\Master\Product\TypeController;
+use App\Http\Controllers\NumberingPreviewController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\Settings\NumberingModuleSettingsController;
 use App\Http\Controllers\Settings\SettingsController;
@@ -73,11 +74,22 @@ Route::middleware([
     Route::get('/profile', [ProfileController::class, 'show'])
         ->name('profile.show');
 
+    Route::get('/numbering/{numberingModule:code}/preview', NumberingPreviewController::class)
+        ->name('numbering.preview');
+
     Route::get('/', function (Request $request, DashboardDataService $dashboardData) {
         $user = $request->user();
         abort_unless($user instanceof User, 401);
 
-        return inertia('Dashboard/Index', $dashboardData->forUser($user));
+        $departmentId = $request->query('department_id');
+
+        return inertia(
+            'Dashboard/Index',
+            $dashboardData->forUser(
+                $user,
+                is_string($departmentId) ? $departmentId : null,
+            ),
+        );
     })->name('dashboard');
 
     Route::get('/settings', [
@@ -97,12 +109,6 @@ Route::middleware([
         'update',
     ])->middleware('can:system.settings.update')
         ->name('settings.modules.update');
-
-    Route::post('/settings/modules', [
-        NumberingModuleSettingsController::class,
-        'store',
-    ])->middleware('can:system.settings.update')
-        ->name('settings.modules.store');
 
     Route::post('/settings/backup', [
         SettingsController::class,
@@ -149,6 +155,8 @@ Route::middleware([
             ->except(['show']);
         Route::resource('license-types', LicenseTypeController::class)
             ->except(['show']);
+        Route::get('products/export', [ProductController::class, 'export'])
+            ->name('products.export');
         Route::resource('products', ProductController::class)
             ->names('products');
     });

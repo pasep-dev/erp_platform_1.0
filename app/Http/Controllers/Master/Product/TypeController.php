@@ -2,12 +2,15 @@
 
 namespace App\Http\Controllers\Master\Product;
 
+use App\Enums\NumberingModuleCode;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Master\Product\TypeRequest;
 use App\Models\Master\Product\Category;
 use App\Models\Master\Product\Type;
+use App\Services\NumberingService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -51,7 +54,8 @@ class TypeController extends Controller
     {
         $categories = Category::query()
             ->where('is_active', true)
-            ->orderBy('name')
+            ->whereNotNull('parent_id')
+            ->with('parent:id,code,name')
             ->get([
                 'id',
                 'code',
@@ -67,9 +71,28 @@ class TypeController extends Controller
         );
     }
 
-    public function store(TypeRequest $request): RedirectResponse
+    public function store(TypeRequest $request, NumberingService $numberingService): RedirectResponse
     {
-        Type::create($request->validated());
+        $data = $request->validated();
+
+        if (! $numberingService->hasActiveDocument(NumberingModuleCode::ProductType)) {
+            throw ValidationException::withMessages([
+                'code' => 'Configure an active PRODUCT_TYPE numbering rule before creating a type.',
+            ]);
+        }
+
+        $data['code'] = mb_strtoupper(
+            $numberingService->generate(NumberingModuleCode::ProductType),
+            'UTF-8',
+        );
+
+        if (Type::query()->where('code', $data['code'])->exists()) {
+            throw ValidationException::withMessages([
+                'code' => 'Generated type code already exists. Update the numbering sequence start.',
+            ]);
+        }
+
+        Type::create($data);
 
         return to_route('master.product.types.index')
             ->with('success', 'Asset Type was created successfully.');
@@ -80,7 +103,11 @@ class TypeController extends Controller
         $categories = Category::query()
             ->where(function ($query) use ($type) {
                 $query
-                    ->where('is_active', true)
+                    ->where(function ($query) {
+                        $query
+                            ->where('is_active', true)
+                            ->whereNotNull('parent_id');
+                    })
                     ->orWhere('id', $type->category_id);
             })
             ->orderBy('name')

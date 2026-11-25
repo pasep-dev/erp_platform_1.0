@@ -2,8 +2,11 @@
 
 namespace App\Http\Controllers\Transaction\AssetManagement;
 
+use App\Enums\Administrator\Workflow\ApprovalAction as ApprovalActionEnum;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Transaction\AssetManagement\ImportAssetDirectoryRequest;
+use App\Models\Administrator\Workflow\ApprovalRequest;
+use App\Models\Master\Organization\Branch;
 use App\Models\Master\Organization\Company;
 use App\Models\Master\Organization\Department;
 use App\Models\Master\Organization\Location;
@@ -30,9 +33,15 @@ class AssetDirectoryController extends Controller
 
         $asset->load([
             ...$this->assetRelationships($service),
-            'goodsReceiptItem.goodsReceipt:id,number,source_type,purchase_order_id,purchase_request_id',
-            'goodsReceiptItem.goodsReceipt.purchaseOrder:id,number',
-            'goodsReceiptItem.goodsReceipt.purchaseRequest:id,number',
+            'goodsReceiptItem.goodsReceipt:id,number,source_type,purchase_order_id,purchase_request_id,received_at,created_at,created_by,posted_at,posted_by',
+            'goodsReceiptItem.goodsReceipt.createdBy:id,name',
+            'goodsReceiptItem.goodsReceipt.postedBy:id,name',
+            'goodsReceiptItem.goodsReceipt.purchaseOrder:id,number,purchase_request_id,created_at,submitted_at,submitted_by',
+            'goodsReceiptItem.goodsReceipt.purchaseOrder.submittedBy:id,name',
+            'goodsReceiptItem.goodsReceipt.purchaseOrder.purchaseRequest:id,number,request_date,requester_id,created_at,approved_at',
+            'goodsReceiptItem.goodsReceipt.purchaseOrder.purchaseRequest.requester:id,name',
+            'goodsReceiptItem.goodsReceipt.purchaseRequest:id,number,request_date,requester_id,created_at,approved_at',
+            'goodsReceiptItem.goodsReceipt.purchaseRequest.requester:id,name',
             'assignmentHistories' => fn (HasMany $query): HasMany => $query
                 ->with(['fromCustodian:id,name', 'toCustodian:id,name', 'performedBy:id,name'])
                 ->orderByDesc('effective_at')->orderByDesc('created_at'),
@@ -51,8 +60,35 @@ class AssetDirectoryController extends Controller
                 ->with(['requestedBy:id,name', 'decidedBy:id,name'])->orderByDesc('created_at'),
         ]);
 
+        $purchaseRequest = $asset->goodsReceiptItem?->goodsReceipt?->purchaseOrder?->purchaseRequest
+            ?? $asset->goodsReceiptItem?->goodsReceipt?->purchaseRequest;
+        $approvalRequest = $purchaseRequest === null
+            ? null
+            : ApprovalRequest::query()
+                ->with(['workflow:id,name', 'manualApprover:id,name', 'actions.user:id,name'])
+                ->where('module', 'PURCHASE_REQUEST')
+                ->where('document_type', 'PURCHASE_REQUEST')
+                ->where('document_id', $purchaseRequest->id)
+                ->latest('created_at')
+                ->first();
+        $approvedBy = $approvalRequest?->manualApprover?->name;
+        if ($approvedBy === null && $approvalRequest !== null) {
+            $approvedBy = $approvalRequest->actions
+                ->filter(fn ($action): bool => $action->action === ApprovalActionEnum::APPROVED)
+                ->pluck('user.name')
+                ->filter()
+                ->unique()
+                ->implode(', ');
+        }
+
         return Inertia::render('Transaction/AssetManagement/Directory/Show', [
             'asset' => $asset,
+            'purchase_request_approval' => $approvalRequest === null ? null : [
+                'method' => $approvalRequest->manual_approved_by !== null
+                    ? 'Manual'
+                    : ($approvalRequest->workflow?->name ?? 'Workflow'),
+                'approved_by' => $approvedBy !== '' ? $approvedBy : null,
+            ],
             'can_create_maintenance' => $request->user()?->can('asset.create') === true,
             'can_dispose' => $request->user()?->can('asset.dispose') === true,
         ]);
@@ -69,16 +105,29 @@ class AssetDirectoryController extends Controller
             'department_id' => ['nullable', 'ulid', 'exists:mst_org_departments,id'],
             'location_id' => ['nullable', 'ulid', 'exists:mst_org_locations,id'],
             'status' => ['nullable', 'in:ALL,ACTIVE,MISSING,DISPOSAL_PENDING,DISPOSED'],
+            'sort_field' => ['nullable', 'in:asset,company,branch,assignment,status,warranty'],
+            'sort_direction' => ['nullable', 'in:asc,desc'],
             'per_page' => ['nullable', 'integer', 'in:5,15,25,50,100'],
         ]);
         $perPage = (int) ($validated['per_page'] ?? 15);
+        $sortField = $validated['sort_field'] ?? 'asset';
+        $sortDirection = $validated['sort_direction'] ?? 'asc';
         $assetQuery = $service->query($request);
 
-        $assets = (clone $assetQuery)
-            ->with($this->assetRelationships($service))
-            ->orderBy('number')
-            ->paginate($perPage)
-            ->withQueryString();
+        $sortedQuery = (clone $assetQuery)->with($this->assetRelationships($service));
+        match ($sortField) {
+            'company' => $sortedQuery
+                ->orderBy(Company::query()->select('name')->whereColumn('mst_org_companies.id', 'trx_assets.company_id'), $sortDirection)
+                ->orderBy(Department::query()->select('name')->whereColumn('mst_org_departments.id', 'trx_assets.department_id'), $sortDirection),
+            'branch' => $sortedQuery
+                ->orderBy(Branch::query()->select('name')->whereColumn('mst_org_branches.id', 'trx_assets.branch_id'), $sortDirection)
+                ->orderBy(Location::query()->select('name')->whereColumn('mst_org_locations.id', 'trx_assets.location_id'), $sortDirection),
+            'assignment' => $sortedQuery->orderBy(User::query()->select('name')->whereColumn('users.id', 'trx_assets.custodian_id'), $sortDirection),
+            'status' => $sortedQuery->orderBy('trx_assets.status', $sortDirection),
+            'warranty' => $sortedQuery->orderBy('trx_assets.warranty_end_date', $sortDirection),
+            default => $sortedQuery->orderBy('trx_assets.number', $sortDirection),
+        };
+        $assets = $sortedQuery->orderBy('trx_assets.id')->paginate($perPage)->withQueryString();
 
         return Inertia::render('Transaction/AssetManagement/Directory/Index', [
             'assets' => $assets,
@@ -88,6 +137,8 @@ class AssetDirectoryController extends Controller
                 'department_id' => $validated['department_id'] ?? null,
                 'location_id' => $validated['location_id'] ?? null,
                 'status' => $validated['status'] ?? 'ALL',
+                'sort_field' => $sortField,
+                'sort_direction' => $sortDirection,
                 'per_page' => $perPage,
             ],
             'counts' => [
@@ -99,7 +150,6 @@ class AssetDirectoryController extends Controller
             'companies' => Company::query()->whereIn('id', Department::query()->whereIn('id', $departmentAccess->departmentIds($user))->select('company_id'))->where('is_active', true)->orderBy('name')->get(['id', 'code', 'name']),
             'departments' => $departmentAccess->scopeDepartments(Department::query(), $user)->where('is_active', true)->orderBy('name')->get(['id', 'code', 'name']),
             'locations' => Location::query()->whereIn('company_id', Department::query()->whereIn('id', $departmentAccess->departmentIds($user))->select('company_id'))->where('is_active', true)->orderBy('name')->get(['id', 'company_id', 'branch_id', 'code', 'name']),
-            'can_import' => $request->user()?->can('asset.create') === true,
             'can_create_maintenance' => $request->user()?->can('asset.create') === true,
             'can_dispose' => $request->user()?->can('asset.dispose') === true,
             'reminders' => $this->reminders($user, $departmentAccess),
@@ -113,7 +163,7 @@ class AssetDirectoryController extends Controller
 
     public function template(Request $request): StreamedResponse
     {
-        abort_unless($request->user()?->can('asset.create'), 403);
+        abort_unless($request->user()?->can('registration.create'), 403);
 
         $headers = AssetDirectoryService::IMPORT_HEADERS;
 
@@ -130,7 +180,7 @@ class AssetDirectoryController extends Controller
     {
         $count = $service->import($request->file('file'), $request->user());
 
-        return to_route('transaction.asset-management.directory.index')
+        return to_route('transaction.asset-management.registrations.index')
             ->with('success', $count.' aset existing berhasil diimpor.');
     }
 
@@ -189,13 +239,13 @@ class AssetDirectoryController extends Controller
         if (in_array($scope, ['selected', 'specific'], true)) {
             $validated = $request->validate([
                 'ids' => ['required', 'array', 'min:1'],
-                'ids.*' => ['required', 'ulid', 'distinct', 'exists:assets,id'],
+                'ids.*' => ['required', 'ulid', 'distinct', 'exists:trx_assets,id'],
             ]);
             abort_if($scope === 'specific' && count($validated['ids']) !== 1, 422);
             $assets = Asset::query()
                 ->whereIn('id', $validated['ids'])
                 ->orderBy('number')
-                ->with(['company:id,code', 'department:id,code'])
+                ->with(['company:id,code,name', 'department:id,code'])
                 ->get(['id', 'number', 'company_id', 'department_id']);
         } else {
             abort_unless(in_array($scope, ['all', 'page'], true), 422);
@@ -204,12 +254,12 @@ class AssetDirectoryController extends Controller
             if ($scope === 'page') {
                 $validated = $request->validate([
                     'ids' => ['required', 'array', 'min:1'],
-                    'ids.*' => ['required', 'ulid', 'distinct', 'exists:assets,id'],
+                    'ids.*' => ['required', 'ulid', 'distinct', 'exists:trx_assets,id'],
                 ]);
                 $query->whereIn('id', $validated['ids']);
             }
 
-            $assets = $query->with(['company:id,code', 'department:id,code'])
+            $assets = $query->with(['company:id,code,name', 'department:id,code'])
                 ->orderBy('number')
                 ->get(['id', 'number', 'company_id', 'department_id']);
         }
@@ -219,6 +269,7 @@ class AssetDirectoryController extends Controller
                 'id' => $asset->id,
                 'number' => $asset->number,
                 'company_code' => $asset->company?->code ?? '-',
+                'company_name' => $asset->company?->name ?? '-',
                 'department_code' => $asset->department?->code ?? '-',
             ])->values(),
         ]);
@@ -229,55 +280,45 @@ class AssetDirectoryController extends Controller
     {
         return array_merge($service->relationships(), [
             'latestMaintenanceRecord' => fn (HasOne $query) => $query->select([
-                'asset_maintenance_records.id',
-                'asset_maintenance_records.asset_id',
-                'asset_maintenance_records.next_service_date',
+                'trx_asset_maintenance_records.id',
+                'trx_asset_maintenance_records.asset_id',
+                'trx_asset_maintenance_records.next_service_date',
             ]),
         ]);
     }
 
-    /** @return array{service_due: Collection<int, Asset>, warranty_due: Collection<int, Asset>} */
+    /** @return array{service_due: Collection<int, Asset>} */
     private function reminders(User $user, DepartmentAccessService $departmentAccess): array
     {
         $reminderCutoff = today()->addDays(30)->toDateString();
 
-        $serviceDue = $departmentAccess->scopeByDepartment(Asset::query(), $user, 'assets.department_id')
+        $serviceDue = $departmentAccess->scopeByDepartment(Asset::query(), $user, 'trx_assets.department_id')
             ->where('status', Asset::STATUS_ACTIVE)
             ->whereHas('latestMaintenanceRecord', fn (Builder $query) => $query
-                ->where('asset_maintenance_records.status', AssetMaintenanceRecord::STATUS_COMPLETED)
-                ->whereNotNull('asset_maintenance_records.next_service_date')
-                ->whereDate('asset_maintenance_records.next_service_date', '<=', $reminderCutoff))
+                ->where('trx_asset_maintenance_records.status', AssetMaintenanceRecord::STATUS_COMPLETED)
+                ->whereNotNull('trx_asset_maintenance_records.next_service_date')
+                ->whereDate('trx_asset_maintenance_records.next_service_date', '<=', $reminderCutoff))
             ->with([
                 'latestMaintenanceRecord' => fn (HasOne $query) => $query->select([
-                    'asset_maintenance_records.id',
-                    'asset_maintenance_records.asset_id',
-                    'asset_maintenance_records.next_service_date',
+                    'trx_asset_maintenance_records.id',
+                    'trx_asset_maintenance_records.asset_id',
+                    'trx_asset_maintenance_records.next_service_date',
                 ]),
                 'product:id,code,name',
             ])
             ->orderBy(AssetMaintenanceRecord::query()
                 ->select('next_service_date')
-                ->whereColumn('asset_maintenance_records.asset_id', 'assets.id')
-                ->where('asset_maintenance_records.status', AssetMaintenanceRecord::STATUS_COMPLETED)
-                ->whereNotNull('asset_maintenance_records.next_service_date')
-                ->orderByDesc('asset_maintenance_records.id')
+                ->whereColumn('trx_asset_maintenance_records.asset_id', 'trx_assets.id')
+                ->where('trx_asset_maintenance_records.status', AssetMaintenanceRecord::STATUS_COMPLETED)
+                ->whereNotNull('trx_asset_maintenance_records.next_service_date')
+                ->orderByDesc('trx_asset_maintenance_records.id')
                 ->limit(1))
             ->orderBy('number')
             ->limit(10)
             ->get(['id', 'number', 'product_id']);
 
-        $warrantyDue = $departmentAccess->scopeByDepartment(Asset::query(), $user, 'assets.department_id')
-            ->where('status', Asset::STATUS_ACTIVE)
-            ->whereNotNull('warranty_end_date')
-            ->whereDate('warranty_end_date', '<=', $reminderCutoff)
-            ->with('product:id,code,name')
-            ->orderBy('warranty_end_date')
-            ->limit(10)
-            ->get(['id', 'number', 'product_id', 'warranty_end_date']);
-
         return [
             'service_due' => $serviceDue,
-            'warranty_due' => $warrantyDue,
         ];
     }
 }

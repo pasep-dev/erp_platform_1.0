@@ -1,15 +1,15 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import { Link, router, useForm } from '@inertiajs/vue3'
+import { Link, router } from '@inertiajs/vue3'
 import { route } from 'ziggy-js'
 import AppLayout from '@/layout/AppLayout.vue'
 import AppPagination from '@/components/common/AppPagination.vue'
 import DataTableToolbar from '@/components/common/DataTableToolbar.vue'
 import AssetManagementPageHeader from '@/components/asset/AssetManagementPageHeader.vue'
+import PrintDocumentHeader from '@/components/print/PrintDocumentHeader.vue'
 import AssetQrCode from '@/components/asset/AssetQrCode.vue'
 import AssetBarcode from '@/components/asset/AssetBarcode.vue'
 import Button from 'primevue/button'
-import Dialog from 'primevue/dialog'
 import Tag from 'primevue/tag'
 import Select from 'primevue/select'
 
@@ -48,21 +48,19 @@ interface ReminderAsset {
     id: string
     number: string
     product: { code: string; name: string }
-    warranty_end_date?: string | null
     latest_maintenance_record?: { next_service_date: string | null } | null
 }
 
 const props = defineProps<{
     assets: { data: Asset[]; total: number; per_page: number; links: { url: string | null; label: string; active: boolean }[] }
-    filters: { search: string; company_id: string | null; department_id: string | null; location_id: string | null; status: string; per_page: number }
+    filters: { search: string; company_id: string | null; department_id: string | null; location_id: string | null; status: string; sort_field: string; sort_direction: string; per_page: number }
     counts: { total: number; active: number; assigned: number; disposed: number }
     companies: OrganizationOption[]
     departments: OrganizationOption[]
     locations: OrganizationOption[]
-    can_import: boolean
     can_create_maintenance: boolean
     can_dispose: boolean
-    reminders: { service_due: ReminderAsset[]; warranty_due: ReminderAsset[] }
+    reminders: { service_due: ReminderAsset[] }
 }>()
 
 const search = ref(props.filters.search)
@@ -78,11 +76,16 @@ const detailVisible = ref(false)
 const codeCopied = ref(false)
 const printDialogVisible = ref(false)
 const printScope = ref<'selected' | 'page' | 'all'>('page')
-const importVisible = ref(false)
-const importInput = ref<HTMLInputElement | null>(null)
-const importForm = useForm<{ file: File | null }>({ file: null })
+const activeReminder = ref<'service' | null>(null)
+const sortField = ref(props.filters.sort_field || 'asset')
+const sortDirection = ref(props.filters.sort_direction || 'asc')
 
 const companyOptions = computed(() => [{ id: allOrganizationValue, code: '', name: 'Semua perusahaan' }, ...props.companies])
+const printCompanyName = computed(() => {
+    const companyNames = [...new Set(props.assets.data.map((asset) => asset.company.name).filter(Boolean))]
+
+    return companyNames.length === 1 ? companyNames[0] : companyNames.length > 1 ? 'Multi-company' : null
+})
 const departmentOptions = computed(() => [{ id: allOrganizationValue, code: '', name: 'Semua departemen' }, ...props.departments])
 const locationOptions = computed(() => [{ id: allOrganizationValue, code: '', name: 'Semua lokasi' }, ...props.locations])
 
@@ -102,6 +105,8 @@ function filterParams(): Record<string, string | number | undefined> {
         department_id: departmentId.value !== allOrganizationValue ? departmentId.value || undefined : undefined,
         location_id: locationId.value !== allOrganizationValue ? locationId.value || undefined : undefined,
         status: status.value !== 'ALL' ? status.value : undefined,
+        sort_field: sortField.value,
+        sort_direction: sortDirection.value,
         per_page: perPage.value,
     }
 }
@@ -112,6 +117,8 @@ function clearFilters(): void {
     departmentId.value = allOrganizationValue
     locationId.value = allOrganizationValue
     status.value = 'ALL'
+    sortField.value = 'asset'
+    sortDirection.value = 'asc'
     perPage.value = 15
     applyFilters()
 }
@@ -159,26 +166,14 @@ async function copyAssetNumber(): Promise<void> {
     }, 1800)
 }
 
-function chooseImportFile(event: Event): void {
-    importForm.file = (event.target as HTMLInputElement).files?.[0] ?? null
-}
-
-function submitImport(): void {
-    if (importForm.file === null) {
-        return
+function changeSort(field: string): void {
+    if (sortField.value === field) {
+        sortDirection.value = sortDirection.value === 'asc' ? 'desc' : 'asc'
+    } else {
+        sortField.value = field
+        sortDirection.value = 'asc'
     }
-
-    importForm.post(route('transaction.asset-management.directory.import'), {
-        forceFormData: true,
-        preserveScroll: true,
-        onSuccess: () => {
-            importVisible.value = false
-            importForm.reset()
-            if (importInput.value) {
-                importInput.value.value = ''
-            }
-        },
-    })
+    applyFilters()
 }
 
 function printQrCodes(scope: 'page' | 'all' | 'selected' | 'specific', specificId?: string): void {
@@ -277,7 +272,6 @@ function assignmentSeverity(status: string): 'success' | 'info' | 'danger' | 'wa
                 <Button label="Cetak Laporan" icon="pi pi-file-pdf" severity="secondary" outlined :disabled="assets.data.length === 0" @click="printReport" />
                 <Button label="Export CSV" icon="pi pi-download" severity="secondary" :disabled="assets.total === 0" @click="exportReport" />
                 <Button label="Cetak QR" icon="pi pi-qrcode" severity="secondary" outlined :disabled="assets.total === 0" v-tooltip.top="'Pilih aset yang akan dicetak QR code-nya'" @click="openPrintOptions" />
-                <Button v-if="can_import" label="Import Template" icon="pi pi-upload" severity="secondary" outlined @click="importVisible = true" />
             </div>
             </template>
         </AssetManagementPageHeader>
@@ -289,29 +283,18 @@ function assignmentSeverity(status: string): 'success' | 'info' | 'danger' | 'wa
             <article class="rounded-xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-900 dark:bg-amber-950/30"><p class="text-xs text-amber-800 dark:text-amber-300">Disposed</p><p class="mt-2 text-2xl font-semibold text-amber-700">{{ counts.disposed.toLocaleString('id-ID') }}</p></article>
         </section>
 
-        <section class="report-toolbar grid gap-4 xl:grid-cols-2 print:hidden">
-            <article class="overflow-hidden rounded-xl border border-amber-200 bg-white dark:border-amber-900 dark:bg-gray-900">
-                <header class="border-b border-amber-100 px-5 py-4 dark:border-amber-900"><h2 class="font-semibold text-gray-900 dark:text-white">Pengingat garansi</h2><p class="mt-1 text-xs text-gray-500">Garansi yang sudah berakhir atau berakhir dalam 30 hari.</p></header>
-                <div v-if="reminders.warranty_due.length" class="divide-y divide-gray-100 dark:divide-gray-800">
-                    <Link v-for="asset in reminders.warranty_due" :key="asset.id" :href="route('transaction.asset-management.assignments.show', asset.id)" class="flex items-center justify-between gap-3 px-5 py-3 hover:bg-gray-50 dark:hover:bg-white/[0.03]">
-                        <span class="min-w-0"><span class="block truncate text-sm font-medium text-gray-900 dark:text-white">{{ asset.number }} · {{ asset.product.name }}</span><span class="text-xs text-gray-500">Berakhir {{ date(asset.warranty_end_date) }}</span></span>
-                        <Tag :value="dueLabel(asset.warranty_end_date)" :severity="dueSeverity(asset.warranty_end_date)" />
-                    </Link>
-                </div>
-                <p v-else class="px-5 py-6 text-sm text-gray-500">Tidak ada garansi yang jatuh tempo dalam 30 hari.</p>
-            </article>
-
-            <article class="overflow-hidden rounded-xl border border-purple-200 bg-white dark:border-purple-900 dark:bg-gray-900">
-                <header class="border-b border-purple-100 px-5 py-4 dark:border-purple-900"><h2 class="font-semibold text-gray-900 dark:text-white">Pengingat service</h2><p class="mt-1 text-xs text-gray-500">Jadwal service yang terlewat atau jatuh tempo dalam 30 hari.</p></header>
-                <div v-if="reminders.service_due.length" class="divide-y divide-gray-100 dark:divide-gray-800">
-                    <Link v-for="asset in reminders.service_due" :key="asset.id" :href="route('transaction.asset-management.assignments.show', asset.id)" class="flex items-center justify-between gap-3 px-5 py-3 hover:bg-gray-50 dark:hover:bg-white/[0.03]">
-                        <span class="min-w-0"><span class="block truncate text-sm font-medium text-gray-900 dark:text-white">{{ asset.number }} · {{ asset.product.name }}</span><span class="text-xs text-gray-500">Jadwal {{ date(asset.latest_maintenance_record?.next_service_date) }}</span></span>
-                        <Tag :value="dueLabel(asset.latest_maintenance_record?.next_service_date)" :severity="dueSeverity(asset.latest_maintenance_record?.next_service_date)" />
-                    </Link>
-                </div>
-                <p v-else class="px-5 py-6 text-sm text-gray-500">Tidak ada jadwal service yang jatuh tempo dalam 30 hari.</p>
-            </article>
-            <p class="xl:col-span-2 text-xs text-gray-500">Pengingat dihitung dari data aktif ketika halaman dibuka. Aset yang sudah disposed tidak dimasukkan.</p>
+        <section class="report-toolbar print:hidden">
+            <button type="button" class="flex w-full flex-wrap items-center justify-between gap-3 rounded-xl border border-purple-200 bg-white px-4 py-3 text-left shadow-sm dark:border-purple-900 dark:bg-gray-900" :aria-expanded="activeReminder === 'service'" @click="activeReminder = activeReminder === 'service' ? null : 'service'">
+                <span class="flex items-center gap-2 font-medium text-gray-900 dark:text-white"><i class="pi pi-wrench text-purple-700 dark:text-purple-300" />Pengingat service <span class="rounded-full bg-purple-100 px-2 py-0.5 text-xs text-purple-800 dark:bg-purple-900/50 dark:text-purple-200">{{ reminders.service_due.length }}</span></span>
+                <span class="text-xs text-gray-500">Jadwal terlewat atau dalam 30 hari <i :class="activeReminder === 'service' ? 'pi pi-chevron-up ml-1' : 'pi pi-chevron-down ml-1'" /></span>
+            </button>
+            <div v-if="activeReminder === 'service'" class="mt-2 overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">
+                <Link v-for="asset in reminders.service_due" :key="asset.id" :href="route('transaction.asset-management.directory.show', asset.id)" class="flex items-center justify-between gap-3 border-b border-gray-100 px-4 py-2.5 last:border-0 hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-white/[0.03]">
+                    <span class="min-w-0"><span class="block truncate text-sm font-medium text-gray-900 dark:text-white">{{ asset.number }} · {{ asset.product.name }}</span><span class="text-xs text-gray-500">Jadwal {{ date(asset.latest_maintenance_record?.next_service_date) }}</span></span>
+                    <Tag :value="dueLabel(asset.latest_maintenance_record?.next_service_date)" :severity="dueSeverity(asset.latest_maintenance_record?.next_service_date)" />
+                </Link>
+                <p v-if="reminders.service_due.length === 0" class="px-4 py-3 text-sm text-gray-500">Tidak ada jadwal service yang jatuh tempo.</p>
+            </div>
         </section>
 
         <section class="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">
@@ -319,17 +302,20 @@ function assignmentSeverity(status: string): 'success' | 'info' | 'danger' | 'wa
                 <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Daftar dan laporan aset</h2>
                 <p class="text-xs text-gray-500">Gunakan filter untuk menyusun hasil laporan. Export memuat semua hasil, cetak memuat halaman aktif.</p>
             </div>
+            <div class="hidden px-5 pt-4 print:block">
+                <PrintDocumentHeader domain="asset-management" title="Asset Directory" :company-name="printCompanyName" :date-label="`Dicetak · ${new Intl.DateTimeFormat('id-ID', { dateStyle: 'medium' }).format(new Date())}`" />
+            </div>
             <DataTableToolbar v-model="search" :total="assets.total" total-label="Aset" placeholder="Cari kode aset, SN, produk, atau pengguna..." @search="applyFilters">
                 <Select v-model="companyId" :options="companyOptions" option-label="name" option-value="id" filter class="w-full sm:w-44" aria-label="Filter perusahaan" @change="applyFilters" />
                 <Select v-model="departmentId" :options="departmentOptions" option-label="name" option-value="id" filter class="w-full sm:w-44" aria-label="Filter departemen" @change="applyFilters" />
                 <Select v-model="locationId" :options="locationOptions" option-label="name" option-value="id" filter class="w-full sm:w-40" aria-label="Filter lokasi" @change="applyFilters" />
-                <Select v-model="status" :options="[{ label: 'Semua Status', value: 'ALL' }, { label: 'Aktif', value: 'ACTIVE' }, { label: 'Tidak Ditemukan', value: 'MISSING' }, { label: 'Menunggu Pelepasan', value: 'DISPOSAL_PENDING' }, { label: 'Disposed', value: 'DISPOSED' }]" option-label="label" option-value="value" class="w-full sm:w-44" aria-label="Filter status aset" @change="applyFilters" />
+                <Select v-model="status" :options="[{ label: 'Semua Status', value: 'ALL' }, { label: 'Tidak Ditemukan', value: 'MISSING' }, { label: 'Menunggu Pelepasan', value: 'DISPOSAL_PENDING' }, { label: 'Disposed', value: 'DISPOSED' }]" option-label="label" option-value="value" class="w-full sm:w-44" aria-label="Filter status aset" @change="applyFilters" />
                 <Button type="button" label="Reset" severity="secondary" outlined @click="clearFilters" />
             </DataTableToolbar>
 
             <div class="overflow-x-auto">
                 <table class="w-full min-w-[1050px] text-left text-sm">
-                    <thead class="bg-gray-50 text-xs uppercase text-gray-500 dark:bg-gray-800 dark:text-gray-400"><tr><th class="px-3 py-3 print:hidden"></th><th class="px-4 py-3">Aset</th><th class="px-4 py-3">Perusahaan / Departemen</th><th class="px-4 py-3">Cabang / Lokasi</th><th class="px-4 py-3">Penugasan</th><th class="px-4 py-3">Status</th><th class="px-4 py-3">Perolehan</th><th class="px-4 py-3">Garansi / Service</th><th class="px-4 py-3 text-right print:hidden">Aksi</th></tr></thead>
+                    <thead class="bg-gray-50 text-xs uppercase text-gray-500 dark:bg-gray-800 dark:text-gray-400"><tr><th class="px-3 py-3 print:hidden"></th><th v-for="column in [{ key: 'asset', label: 'Aset' }, { key: 'company', label: 'Perusahaan / Departemen' }, { key: 'branch', label: 'Cabang / Lokasi' }, { key: 'assignment', label: 'Penugasan' }, { key: 'status', label: 'Status' }, { key: 'warranty', label: 'Garansi' }]" :key="column.key" class="px-4 py-3"><button type="button" class="inline-flex items-center gap-1 hover:text-purple-700" @click="changeSort(column.key)">{{ column.label }}<i :class="sortField === column.key ? (sortDirection === 'asc' ? 'pi pi-sort-amount-up-alt' : 'pi pi-sort-amount-down') : 'pi pi-sort-alt'" /></button></th><th class="px-4 py-3 text-right print:hidden">Aksi</th></tr></thead>
                     <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
                         <tr v-for="asset in assets.data" :key="asset.id" class="text-gray-700 dark:text-gray-200">
                             <td class="px-3 py-3 print:hidden"><input type="checkbox" class="h-4 w-4 rounded border-gray-300 text-purple-700 focus:ring-purple-600" :checked="selectedIds.includes(asset.id)" :aria-label="`Pilih ${asset.number}`" @change="toggleAssetSelection(asset.id, $event)" /></td>
@@ -338,30 +324,15 @@ function assignmentSeverity(status: string): 'success' | 'info' | 'danger' | 'wa
                             <td class="px-4 py-3">{{ asset.branch?.code ?? '-' }}<div class="text-xs text-gray-500">{{ asset.location.code }} · {{ asset.location.name }}</div></td>
                             <td class="px-4 py-3"><Tag :value="assignmentLabel(asset)" :severity="assignmentSeverity(asset.status)" /><div v-if="asset.custodian" class="mt-1 text-xs text-gray-500">{{ asset.custodian.name }}</div></td>
                             <td class="px-4 py-3"><Tag :value="assetStatusLabel(asset.status)" :severity="assetStatusSeverity(asset.status)" /></td>
-                            <td class="px-4 py-3">{{ date(asset.acquisition_date) }}<div class="text-xs text-gray-500">{{ asset.acquisition_cost ? `Rp ${Number(asset.acquisition_cost).toLocaleString('id-ID')}` : '-' }}</div></td>
-                            <td class="px-4 py-3"><div>Garansi: {{ date(asset.warranty_end_date) }}</div><div class="text-xs text-gray-500">Service: {{ date(asset.latest_maintenance_record?.next_service_date) }}</div></td>
+                            <td class="px-4 py-3">{{ date(asset.warranty_end_date) }}</td>
                             <td class="px-4 py-3 text-right print:hidden"><Link :href="route('transaction.asset-management.directory.show', asset.id)" class="inline-flex" aria-label="Lihat detail aset"><Button icon="pi pi-eye" severity="secondary" text rounded v-tooltip.top="'Lihat detail dan riwayat aset'" /></Link></td>
                         </tr>
-                        <tr v-if="assets.data.length === 0"><td colspan="9" class="px-4 py-12 text-center text-sm text-gray-500">Tidak ada aset yang sesuai dengan filter.</td></tr>
+                        <tr v-if="assets.data.length === 0"><td colspan="8" class="px-4 py-12 text-center text-sm text-gray-500">Tidak ada aset yang sesuai dengan filter.</td></tr>
                     </tbody>
                 </table>
             </div>
             <AppPagination v-if="assets.total > 0" class="report-toolbar print:hidden" v-model:per-page="perPage" :meta="assets" @change="changePerPage" />
         </section>
-
-        <Dialog v-model:visible="importVisible" modal header="Import Asset Directory" :style="{ width: 'min(42rem, 94vw)' }">
-            <div class="space-y-4">
-                <p class="text-sm text-gray-600 dark:text-gray-300">Gunakan template CSV untuk memasukkan aset existing. Kode produk, perusahaan, departemen, dan lokasi harus sesuai dengan master data.</p>
-                <a :href="route('transaction.asset-management.directory.template')" class="inline-flex items-center gap-2 text-sm font-medium text-purple-700 hover:underline dark:text-purple-300"><i class="pi pi-download" /> Unduh template CSV</a>
-                <input ref="importInput" type="file" accept=".csv,text/csv" class="block w-full rounded-lg border border-gray-300 p-2 text-sm dark:border-gray-700" @change="chooseImportFile" />
-                <small v-if="importForm.errors.file" class="block whitespace-pre-line text-red-600">{{ importForm.errors.file }}</small>
-                <p class="text-xs text-gray-500">Spesifikasi diisi sebagai JSON, contoh: {"RAM":"16GB","Storage":"512GB SSD"}. Semua baris diperiksa sebelum data disimpan.</p>
-            </div>
-            <template #footer>
-                <Button label="Batal" severity="secondary" text @click="importVisible = false" />
-                <Button label="Import" icon="pi pi-upload" :loading="importForm.processing" :disabled="!importForm.file" @click="submitImport" />
-            </template>
-        </Dialog>
 
         <Dialog v-model:visible="printDialogVisible" modal header="Cetak QR Code Aset" :style="{ width: 'min(36rem, 94vw)' }">
             <p class="mb-4 text-sm text-gray-600 dark:text-gray-300">Pilih cakupan aset yang akan disiapkan untuk dicetak.</p>

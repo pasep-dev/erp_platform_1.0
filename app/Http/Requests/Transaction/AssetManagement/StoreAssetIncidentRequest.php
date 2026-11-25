@@ -17,7 +17,7 @@ class StoreAssetIncidentRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'asset_id' => ['required', 'ulid', 'exists:assets,id'],
+            'asset_id' => ['required', 'ulid', 'exists:trx_assets,id'],
             'incident_type' => ['required', Rule::in(AssetIncident::TYPES)],
             'severity' => ['required', Rule::in(['LOW', 'NORMAL', 'HIGH', 'URGENT'])],
             'occurred_at' => ['required', 'date', 'before_or_equal:now'],

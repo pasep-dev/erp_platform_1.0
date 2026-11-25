@@ -2,8 +2,6 @@
 
 namespace App\Models\Master\Product;
 
-use App\Models\Concerns\HasBranchAccessScope;
-use App\Models\Master\Organization\Branch;
 use App\Models\Master\Organization\Department;
 use App\Models\Master\Procurement\UnitOfMeasure;
 use App\Models\Master\Product\Model as AssetModel;
@@ -16,10 +14,10 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Facades\Storage;
 
 class Product extends EloquentModel
 {
-    use HasBranchAccessScope;
     use HasUlids;
     use SoftDeletes;
 
@@ -51,14 +49,24 @@ class Product extends EloquentModel
         'code',
         'name',
         'description',
+        'image_path',
         'is_active',
     ];
+
+    protected $appends = ['image_url'];
 
     protected function casts(): array
     {
         return [
             'is_active' => 'boolean',
         ];
+    }
+
+    public function getImageUrlAttribute(): ?string
+    {
+        return $this->image_path !== null
+            ? Storage::disk('public')->url($this->image_path)
+            : null;
     }
 
     public function category(): BelongsTo
@@ -98,17 +106,7 @@ class Product extends EloquentModel
 
     public function departments(): BelongsToMany
     {
-        return $this->belongsToMany(Department::class, 'product_department')
+        return $this->belongsToMany(Department::class, 'mst_product_departments')
             ->withTimestamps();
-    }
-
-    public function branches(): BelongsToMany
-    {
-        return $this->belongsToMany(Branch::class, 'product_branch')->withTimestamps();
-    }
-
-    protected function branchAccessRelation(): ?string
-    {
-        return 'branches';
     }
 }

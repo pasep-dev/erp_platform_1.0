@@ -18,7 +18,7 @@ class InventoryStockThreshold extends Model
     use HasDepartmentAccessScope;
     use HasUlids;
 
-    protected $table = 'inventory_stock_thresholds';
+    protected $table = 'trx_inventory_stock_thresholds';
 
     protected $fillable = ['department_id', 'location_id', 'product_id', 'minimum_quantity', 'configured_by'];
 

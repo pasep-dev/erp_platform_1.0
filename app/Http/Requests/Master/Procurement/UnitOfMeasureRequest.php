@@ -25,7 +25,7 @@ class UnitOfMeasureRequest extends FormRequest
                 'string',
                 'max:50',
                 'alpha_dash',
-                Rule::unique('mst_units_of_measure', 'code')
+                Rule::unique('mst_prc_uom', 'code')
                     ->ignore($unitOfMeasureId)
                     ->whereNull('deleted_at'),
             ],

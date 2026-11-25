@@ -18,7 +18,7 @@ class StoreAssetTransferRequest extends FormRequest
         $companyId = $this->input('company_id');
 
         return [
-            'asset_id' => ['required', 'ulid', 'exists:assets,id'],
+            'asset_id' => ['required', 'ulid', 'exists:trx_assets,id'],
             'company_id' => ['required', 'ulid', Rule::exists('mst_org_companies', 'id')->where('is_active', true)],
             'department_id' => ['required', 'ulid', Rule::exists('mst_org_departments', 'id')->where('company_id', $companyId)->where('is_active', true), Rule::in(app(DepartmentAccessService::class)->departmentIds($this->user()))],
             'location_id' => ['required', 'ulid', Rule::exists('mst_org_locations', 'id')->where('company_id', $companyId)->where('is_active', true)],

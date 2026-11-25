@@ -16,6 +16,11 @@ interface OrderItem {
     quantity: string | number
     unit_price: string | number | null
     pr_estimated_unit_price: string | number | null
+    tax_included: boolean
+    tax_code?: string | null
+    tax_name?: string | null
+    tax_rate?: string | number | null
+    tax_category?: 'ADDITIVE' | 'WITHHOLDING' | null
     description?: string | null
     product?: { code: string; name: string } | null
     service_type?: { code: string; name: string } | null
@@ -43,6 +48,17 @@ const itemForms = computed(() => form.items.map((entry, index) => ({
     source: props.purchaseOrder.items[index],
     changed: Number(entry.unit_price ?? -1) !== Number(props.purchaseOrder.items[index].unit_price ?? -1),
 })))
+const orderLineTotal = (item: OrderItem, price: number | null) => {
+    const amount = Number(item.quantity) * Number(price ?? 0)
+    const rate = Number(item.tax_rate ?? 0)
+    const tax = rate > 0
+        ? item.tax_category === 'WITHHOLDING'
+            ? Math.round(amount * rate / 100)
+            : Math.round(item.tax_included ? amount * rate / (100 + rate) : amount * rate / 100)
+        : 0
+    return amount + (item.tax_category === 'ADDITIVE' && !item.tax_included ? tax : 0) - (item.tax_category === 'WITHHOLDING' ? tax : 0)
+}
+const estimatedOrderTotal = computed(() => itemForms.value.reduce((sum, item) => sum + orderLineTotal(item.source, item.unit_price), 0))
 const money = (value: number | string | null) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 2 }).format(Number(value ?? 0))
 
 function save() {
@@ -73,6 +89,7 @@ function save() {
                     </div>
                     <div class="text-right text-sm"><div class="text-gray-500">Estimasi PR</div><strong>{{ money(item.source.pr_estimated_unit_price) }}</strong></div>
                 </div>
+                <p v-if="item.source.tax_name" class="mb-4 text-xs text-blue-700 dark:text-blue-400">{{ item.source.tax_code }} · {{ item.source.tax_name }} ({{ Number(item.source.tax_rate) }}%){{ item.source.tax_included ? ' · harga sudah termasuk pajak' : '' }}</p>
                 <div class="grid gap-4 md:grid-cols-2">
                     <div>
                         <label :for="`price-${index}`" class="mb-1 block text-sm font-medium">Harga PO per unit</label>
@@ -87,6 +104,10 @@ function save() {
                     <div v-else class="flex items-center text-sm text-gray-500">Harga sama dengan harga saat ini; alasan perubahan tidak diperlukan.</div>
                 </div>
             </div>
+            <section class="rounded-xl border border-gray-200 bg-white p-5 text-right dark:border-gray-800 dark:bg-gray-900">
+                <div class="text-sm text-gray-500">Total estimasi PO termasuk perhitungan pajak</div>
+                <div class="mt-1 text-xl font-bold text-gray-900 dark:text-white">{{ money(estimatedOrderTotal) }}</div>
+            </section>
             <div v-if="form.errors.items" class="text-sm text-red-600">{{ form.errors.items }}</div>
             <div class="flex justify-end gap-2">
                 <Button label="Batal" severity="secondary" outlined type="button" @click="router.get(route('transaction.procurement.purchase-orders.show', purchaseOrder.id))" />

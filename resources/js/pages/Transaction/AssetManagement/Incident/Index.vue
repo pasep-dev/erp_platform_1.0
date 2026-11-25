@@ -21,7 +21,7 @@ interface Incident {
     status: string
     occurred_at: string
     description: string
-    asset: { id: string; number: string; product: { code: string; name: string } }
+    asset: { id: string; number: string; product: { code: string; name: string } | null } | null
     reported_by: { name: string } | null
 }
 
@@ -88,7 +88,7 @@ function severity(value: string): string {
             </DataTableToolbar>
             <CrudTable :columns="columns" :rows="rows" row-key="id" empty-message="Belum ada laporan insiden aset.">
                 <template #cell-number="{ row }"><span class="font-semibold text-gray-900 dark:text-white">{{ row.incident.number }}</span><div class="text-xs text-gray-500">{{ row.incident.description }}</div></template>
-                <template #cell-asset="{ row }"><span class="font-medium text-gray-900 dark:text-white">{{ row.incident.asset.number }}</span><div class="text-xs text-gray-500">{{ row.incident.asset.product.name }} · {{ row.incident.asset.product.code }}</div></template>
+                <template #cell-asset="{ row }"><span class="font-medium text-gray-900 dark:text-white">{{ row.incident.asset?.number ?? 'Aset tidak tersedia' }}</span><div class="text-xs text-gray-500">{{ row.incident.asset?.product?.name ?? 'Produk tidak tersedia' }}<template v-if="row.incident.asset?.product?.code"> · {{ row.incident.asset.product.code }}</template></div></template>
                 <template #cell-incident_type="{ row }"><span>{{ typeLabel(row.incident.incident_type) }}</span><div class="mt-1"><Tag :value="row.incident.severity" :severity="severity(row.incident.severity)" /></div></template>
                 <template #cell-occurred_at="{ row }">{{ date(row.incident.occurred_at) }}</template>
                 <template #cell-reported_by="{ row }">{{ row.incident.reported_by?.name ?? '-' }}</template>

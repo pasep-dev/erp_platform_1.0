@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Administrator;
 
+use App\Enums\NumberingModuleCode;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Administrator\NumberingDocumentRequest;
 use App\Models\NumberingDocument;
@@ -49,12 +50,14 @@ class NumberingDocumentController extends Controller
         $documents->through(function (NumberingDocument $document): array {
             return [
                 ...$document->toArray(),
-                'module' => $document->module?->only([
-                    'code',
-                    'name',
-                    'category',
-                    'is_active',
-                ]),
+                'module' => NumberingModuleCode::tryFrom($document->code) === null
+                    ? null
+                    : $document->module?->only([
+                        'code',
+                        'name',
+                        'category',
+                        'is_active',
+                    ]),
             ];
         });
 
@@ -67,6 +70,7 @@ class NumberingDocumentController extends Controller
             ],
             'placeholders' => NumberingDocument::SUPPORTED_PLACEHOLDERS,
             'modules' => NumberingModule::query()
+                ->whereIn('code', NumberingModuleCode::values())
                 ->where('is_active', true)
                 ->orderBy('category')
                 ->orderBy('name')
@@ -75,6 +79,13 @@ class NumberingDocumentController extends Controller
                     'name',
                     'category',
                 ])
+                ->map(function (NumberingModule $module): array {
+                    return [
+                        ...$module->toArray(),
+                        'placeholders' => NumberingModuleCode::from($module->code)
+                            ->supportedPlaceholders(),
+                    ];
+                })
                 ->keyBy('code'),
         ]);
     }

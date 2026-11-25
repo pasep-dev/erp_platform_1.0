@@ -25,7 +25,7 @@ class LicenseTypeRequest extends FormRequest
                 'string',
                 'max:50',
                 'alpha_dash',
-                Rule::unique('mst_asset_license_types', 'code')
+                Rule::unique('mst_product_license_types', 'code')
                     ->ignore($licenseTypeId)
                     ->whereNull('deleted_at'),
             ],

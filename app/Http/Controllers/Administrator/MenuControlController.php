@@ -52,7 +52,7 @@ class MenuControlController extends Controller
                 'type' => 'role',
                 'identifier' => null,
                 'is_configured' => in_array($role->id, $configuredIds),
-                'is_editable' => ! in_array($role->name, ['Administrator', 'Owner'], true),
+                'is_editable' => $role->name !== 'Administrator',
             ]);
         } else {
             $targets = User::query()
@@ -80,7 +80,7 @@ class MenuControlController extends Controller
                 'identifier' => $user->email,
                 'roles' => $user->roles->pluck('name')->all(),
                 'is_configured' => in_array($user->id, $configuredIds),
-                'is_editable' => ! $user->hasGlobalDepartmentAccess(),
+                'is_editable' => ! $user->isAdministrator(),
             ]);
         }
 
@@ -112,7 +112,7 @@ class MenuControlController extends Controller
                 ->first();
             $selectedMenuKeys = $profile?->menu_keys;
             $hasCustomSettings = $profile !== null;
-            $isEditable = ! in_array($subject->name, ['Administrator', 'Owner'], true);
+            $isEditable = $subject->name !== 'Administrator';
             $inheritsRoleSettings = false;
         } else {
             $subject = User::query()->findOrFail($target);
@@ -122,7 +122,7 @@ class MenuControlController extends Controller
             $selectedMenuKeys = $profile?->menu_keys
                 ?? $menuVisibilityService->visibleMenuKeysFor($subject);
             $hasCustomSettings = $profile !== null;
-            $isEditable = ! $subject->hasGlobalDepartmentAccess();
+            $isEditable = ! $subject->isAdministrator();
             $inheritsRoleSettings = $profile === null && $selectedMenuKeys !== null;
         }
 
@@ -152,8 +152,8 @@ class MenuControlController extends Controller
 
         abort_if(
             $subject instanceof Role
-                ? in_array($subject->name, ['Administrator', 'Owner'], true)
-                : $subject->hasGlobalDepartmentAccess(),
+                ? $subject->name === 'Administrator'
+                : $subject->isAdministrator(),
             403,
         );
 

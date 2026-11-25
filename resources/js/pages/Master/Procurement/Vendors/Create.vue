@@ -2,6 +2,7 @@
 import { Head, useForm } from "@inertiajs/vue3";
 import { route } from "ziggy-js";
 import { useMasterFieldFormatting } from "@/composables/useMasterFieldFormatting";
+import { useNumberingPreview } from "@/composables/useNumberingPreview";
 
 import AppLayout from "@/layout/AppLayout.vue";
 import MasterActiveToggle from "@/components/common/MasterActiveToggle.vue";
@@ -34,6 +35,8 @@ const form = useForm({
 });
 
 useMasterFieldFormatting(form);
+
+const { enabled: vendorNumberingEnabled, preview: vendorCodePreview, loading: vendorCodeLoading } = useNumberingPreview("VENDOR");
 
 function submit(): void {
     form.post(route("master.procurement.vendors.store"));
@@ -104,15 +107,18 @@ const cancel = () => {
 
                     <input
                         id="code"
-                        v-model="form.code"
+                        :value="vendorCodePreview ?? ''"
                         type="text"
-                        placeholder="Kosongkan untuk dibuat otomatis"
+                        :placeholder="vendorCodeLoading ? 'Memuat preview kode...' : 'Aturan numbering belum tersedia'"
+                        disabled
+                        readonly
                         class="w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 dark:border-gray-700 dark:text-white"
                     />
 
-                    <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                        Kode akan mengikuti aturan aktif pada Administrator - Document Numbering.
-                    </p>
+                    <p v-if="vendorCodeLoading" class="mt-1 text-xs text-gray-500 dark:text-gray-400">Memuat preview kode dari Document Numbering...</p>
+                    <p v-else-if="!vendorNumberingEnabled" class="mt-1 text-xs text-amber-700 dark:text-amber-400">Aturan VENDOR belum aktif. Minta administrator mengaktifkannya.</p>
+                    <p v-else-if="!vendorCodePreview" class="mt-1 text-xs text-amber-700 dark:text-amber-400">Preview kode belum tersedia. Periksa aturan VENDOR.</p>
+                    <p v-else class="mt-1 text-xs text-gray-500 dark:text-gray-400">Kode dibuat otomatis dan tidak dapat diubah.</p>
 
                     <p
                         v-if="form.errors.code"

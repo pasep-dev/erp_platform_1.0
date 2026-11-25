@@ -2,7 +2,8 @@
 
 namespace App\Services\Transaction\Procurement;
 
-use App\Models\NumberingDocument;
+use App\Enums\NumberingModuleCode;
+use App\Models\Master\Organization\Branch;
 use App\Models\Transaction\Procurement\PurchaseOrder;
 use App\Models\Transaction\Procurement\PurchaseRequest;
 use App\Models\Transaction\Procurement\PurchaseRequestItem;
@@ -24,7 +25,7 @@ class PurchaseOrderGenerationService
                 ->with([
                     'company:id,code',
                     'department:id,code',
-                    'items.vendor:id,name',
+                    'items.vendor:id,code,name',
                 ])
                 ->lockForUpdate()
                 ->findOrFail($purchaseRequest->id);
@@ -68,13 +69,20 @@ class PurchaseOrderGenerationService
                     );
                 }
 
+                $branchIds = $vendorItems->pluck('branch_id')->filter()->unique();
+                $branchCode = $branchIds->count() === 1
+                    ? Branch::query()->whereKey($branchIds->first())->value('code')
+                    : 'MULTI';
+
                 $purchaseOrder = PurchaseOrder::query()->create([
                     'number' => $this->numberingService->generate(
-                        NumberingDocument::CODE_PURCHASE_ORDER,
+                        NumberingModuleCode::PurchaseOrder,
                         [
                             'company' => $lockedPurchaseRequest->company->code,
+                            'branch' => $branchCode,
                             'document_type' => 'PO',
                             'department' => $lockedPurchaseRequest->department->code,
+                            'vendor' => $vendor->code,
                         ],
                     ),
                     'purchase_request_id' => $lockedPurchaseRequest->id,
@@ -98,6 +106,11 @@ class PurchaseOrderGenerationService
                         'pr_estimated_unit_price' => $item->estimated_unit_price,
                         'unit_price' => $item->estimated_unit_price,
                         'tax_included' => $item->tax_included,
+                        'tax_id' => $item->tax_id,
+                        'tax_code' => $item->tax_code,
+                        'tax_name' => $item->tax_name,
+                        'tax_rate' => $item->tax_rate,
+                        'tax_category' => $item->tax_category,
                         'required_date' => $item->required_date,
                         'delivery_address' => $item->delivery_address,
                         'vendor_pic' => $item->vendor_pic,

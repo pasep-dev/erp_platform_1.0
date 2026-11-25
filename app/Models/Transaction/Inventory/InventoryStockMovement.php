@@ -19,7 +19,7 @@ class InventoryStockMovement extends Model
     use HasDepartmentAccessScope;
     use HasUlids;
 
-    protected $table = 'inventory_stock_movements';
+    protected $table = 'trx_inventory_stock_movements';
 
     protected $fillable = [
         'product_id',

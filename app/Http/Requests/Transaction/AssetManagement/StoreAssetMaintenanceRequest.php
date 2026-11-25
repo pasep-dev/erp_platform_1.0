@@ -17,7 +17,7 @@ class StoreAssetMaintenanceRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'asset_id' => ['required', 'ulid', Rule::exists('assets', 'id')->where('status', Asset::STATUS_ACTIVE)],
+            'asset_id' => ['required', 'ulid', Rule::exists('trx_assets', 'id')->where('status', Asset::STATUS_ACTIVE)],
             'maintenance_type' => ['required', Rule::in([AssetMaintenanceRecord::TYPE_PREVENTIVE, AssetMaintenanceRecord::TYPE_CORRECTIVE])],
             'execution_mode' => ['required', Rule::in([AssetMaintenanceRecord::EXECUTION_INTERNAL, AssetMaintenanceRecord::EXECUTION_VENDOR])],
             'priority' => ['required', Rule::in(array_keys(AssetMaintenanceRecord::PRIORITY_OPTIONS))],
@@ -25,7 +25,7 @@ class StoreAssetMaintenanceRequest extends FormRequest
             'issue_description' => ['required', 'string', 'max:5000'],
             'reported_condition' => ['required', Rule::in(array_keys(Asset::CONDITION_OPTIONS))],
             'inspection_result' => ['nullable', 'string', 'max:5000'],
-            'vendor_id' => ['nullable', 'required_if:execution_mode,VENDOR', 'ulid', Rule::exists('mst_vendors', 'id')->where('is_active', true)->whereNull('deleted_at')],
+            'vendor_id' => ['nullable', 'required_if:execution_mode,VENDOR', 'ulid', Rule::exists('mst_prc_vendors', 'id')->where('is_active', true)->whereNull('deleted_at')],
             'estimated_cost' => ['nullable', 'numeric', 'min:0', 'max:9999999999999999.99'],
             'scheduled_at' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:requested_at'],
             'components' => ['nullable', 'array', 'max:50'],

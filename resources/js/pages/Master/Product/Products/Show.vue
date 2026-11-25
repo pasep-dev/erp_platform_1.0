@@ -34,6 +34,7 @@ interface Product {
     code: string;
     name: string;
     description: string | null;
+    image_url: string | null;
     group: string;
     category: Category | null;
     type: Type | null;
@@ -110,6 +111,13 @@ function getGroupClass(group: string): string {
                         {{ product.group }}
                     </span>
                 </div>
+
+                <img
+                    v-if="product.image_url"
+                    :src="product.image_url"
+                    :alt="`Gambar ${product.name}`"
+                    class="mt-6 max-h-80 w-full rounded-xl border border-gray-200 bg-gray-50 object-contain dark:border-gray-700 dark:bg-gray-900"
+                />
 
                 <div class="mt-6 grid gap-4 sm:grid-cols-2">
                     <div

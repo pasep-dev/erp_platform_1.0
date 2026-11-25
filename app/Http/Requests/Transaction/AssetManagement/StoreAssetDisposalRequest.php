@@ -16,7 +16,7 @@ class StoreAssetDisposalRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'asset_id' => ['required', 'ulid', 'exists:assets,id'],
+            'asset_id' => ['required', 'ulid', 'exists:trx_assets,id'],
             'disposal_type' => ['required', Rule::in(AssetDisposal::TYPES)],
             'disposal_date' => ['required', 'date_format:Y-m-d', 'before_or_equal:today'],
             'amount' => ['nullable', 'numeric', 'min:0', 'max:9999999999999999.99'],

@@ -2,10 +2,10 @@
 
 namespace App\Http\Controllers\Master\Procurement;
 
+use App\Enums\NumberingModuleCode;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Master\Procurement\VendorTypeRequest;
 use App\Models\Master\Procurement\VendorType;
-use App\Models\NumberingDocument;
 use App\Services\NumberingService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -60,13 +60,16 @@ class VendorTypeController extends Controller
         $data = $request->validated();
 
         if (blank($data['code'] ?? null)) {
-            if (! $numberingService->hasActiveDocument(NumberingDocument::CODE_VENDOR_TYPE)) {
+            if (! $numberingService->hasActiveDocument(NumberingModuleCode::VendorType)) {
                 throw ValidationException::withMessages([
                     'code' => 'Enter a vendor type code or configure an active VENDOR_TYPE numbering rule.',
                 ]);
             }
 
-            $data['code'] = $numberingService->generate(NumberingDocument::CODE_VENDOR_TYPE);
+            $data['code'] = mb_strtoupper(
+                $numberingService->generate(NumberingModuleCode::VendorType),
+                'UTF-8',
+            );
 
             if (VendorType::withTrashed()->where('code', $data['code'])->exists()) {
                 throw ValidationException::withMessages([

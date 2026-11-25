@@ -15,6 +15,7 @@ const form = useForm({
     code: "",
     name: "",
     rate: 0,
+    category: "ADDITIVE",
     description: "",
     is_active: true,
 });
@@ -125,6 +126,15 @@ const cancel = () => {
                     >
                         {{ form.errors.rate }}
                     </p>
+                </div>
+
+                <div>
+                    <label for="category" class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Tax Category</label>
+                    <select id="category" v-model="form.category" class="w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm text-gray-900 dark:border-gray-700 dark:bg-gray-900 dark:text-white">
+                        <option value="ADDITIVE">Pajak menambah total (contoh PPN)</option>
+                        <option value="WITHHOLDING">Pajak potong (contoh PPh)</option>
+                    </select>
+                    <p v-if="form.errors.category" class="mt-1 text-sm text-red-500">{{ form.errors.category }}</p>
                 </div>
 
                 <div>

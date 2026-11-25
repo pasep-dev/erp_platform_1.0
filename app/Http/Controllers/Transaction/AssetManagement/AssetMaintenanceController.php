@@ -287,8 +287,17 @@ class AssetMaintenanceController extends Controller
             'components',
         ]);
 
+        $latestService = $maintenance->asset->maintenanceRecords()
+            ->where('id', '!=', $maintenance->getKey())
+            ->where('status', AssetMaintenanceRecord::STATUS_COMPLETED)
+            ->whereNotNull('completed_at')
+            ->orderByDesc('completed_at')
+            ->orderByDesc('id')
+            ->first(['id', 'number', 'maintenance_type', 'completed_at', 'work_summary']);
+
         return Inertia::render('Transaction/AssetManagement/Maintenance/Print', [
             'maintenance' => $maintenance,
+            'latest_service' => $latestService,
             'auto_print' => $request->boolean('print'),
             'close_after_print' => $request->boolean('closeAfterPrint'),
         ]);

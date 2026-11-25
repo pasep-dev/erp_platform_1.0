@@ -2,6 +2,8 @@
 
 namespace Tests\Feature\Settings;
 
+use App\Enums\NumberingModuleCode;
+use App\Models\NumberingModule;
 use App\Models\Setting;
 use App\Models\User;
 use App\Services\DatabaseBackupService;
@@ -48,8 +50,32 @@ class SettingsControllerTest extends TestCase
                 ->where('backup.retention', 7)
                 ->where('backup.directory', 'backups/scheduled')
                 ->has('backup.backups')
-                ->has('modules', 8)
-                ->where('modules.0.code', 'ASSET_MAINTENANCE'));
+                ->has('modules', 19)
+                ->where('modules.0.code', 'ASSET_ASSIGNMENT'));
+    }
+
+    public function test_settings_only_lists_modules_integrated_with_numbering(): void
+    {
+        $user = $this->userWithPermissions('system.settings.view');
+        NumberingModule::query()->create([
+            'code' => 'SALES_ORDER',
+            'name' => 'Sales Order',
+            'category' => 'Sales',
+            'default_pattern' => null,
+            'sequence_length' => null,
+            'reset_period' => null,
+            'is_active' => true,
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('settings.edit'))
+            ->assertInertia(fn (AssertableInertia $page) => $page
+                ->component('Settings/Index')
+                ->has('modules', 19)
+                ->where('modules', fn (array $modules): bool => collect($modules)
+                    ->pluck('code')
+                    ->diff(NumberingModuleCode::values())
+                    ->isEmpty()));
     }
 
     public function test_user_without_update_permission_cannot_change_module_availability(): void
@@ -95,105 +121,30 @@ class SettingsControllerTest extends TestCase
         ]);
     }
 
-    public function test_registered_module_is_available_for_separate_document_numbering_setup(): void
+    public function test_unintegrated_module_cannot_be_enabled_from_settings(): void
     {
-        $user = $this->userWithPermissions(
-            'system.settings.update',
-            'numbering.document.view',
-            'numbering.document.create',
-        );
-
-        $this->actingAs($user)
-            ->post(route('settings.modules.store'), [
-                'code' => 'SALES_ORDER',
-                'name' => 'Sales Order',
-                'category' => 'Sales',
-            ])
-            ->assertRedirect()
-            ->assertSessionHas(
-                'success',
-                'System module was added successfully.',
-            );
-
-        $this->assertDatabaseHas('numbering_modules', [
+        $user = $this->userWithPermissions('system.settings.update');
+        NumberingModule::query()->create([
             'code' => 'SALES_ORDER',
             'name' => 'Sales Order',
             'category' => 'Sales',
+            'default_pattern' => null,
+            'sequence_length' => null,
+            'reset_period' => null,
             'is_active' => true,
         ]);
-        $this->assertDatabaseMissing('numbering_documents', [
-            'code' => 'SALES_ORDER',
-        ]);
-        $this->assertDatabaseHas('activity_logs', [
-            'user_id' => $user->id,
-            'module' => 'Module Settings',
-            'action' => 'CREATE',
-            'subject_id' => 'SALES_ORDER',
-        ]);
 
         $this->actingAs($user)
-            ->get(route('administrator.numbering-documents.index'))
-            ->assertInertia(fn (AssertableInertia $page) => $page
-                ->where('modules.SALES_ORDER.name', 'Sales Order'));
-
-        $this->actingAs($user)
-            ->post(route('administrator.numbering-documents.store'), [
-                'code' => 'SALES_ORDER',
-                'name' => 'Sales Order Number',
-                'pattern' => 'SO/{YYYY}/{SEQ}',
-                'sequence_length' => 5,
-                'sequence_start' => 1,
-                'reset_period' => 'yearly',
-                'is_active' => true,
+            ->patch(route('settings.modules.update', [
+                'numberingModule' => 'SALES_ORDER',
+            ]), [
+                'is_active' => false,
             ])
-            ->assertRedirect(route('administrator.numbering-documents.index'))
-            ->assertSessionHasNoErrors();
+            ->assertNotFound();
 
-        $this->assertDatabaseHas('numbering_documents', [
+        $this->assertDatabaseHas('numbering_modules', [
             'code' => 'SALES_ORDER',
-            'name' => 'Sales Order Number',
-            'pattern' => 'SO/{YYYY}/{SEQ}',
-        ]);
-    }
-
-    public function test_user_without_update_permission_cannot_register_a_numbering_module(): void
-    {
-        $user = $this->userWithPermissions('system.settings.view');
-
-        $this->actingAs($user)
-            ->post(route('settings.modules.store'), [
-                'code' => 'SALES_ORDER',
-                'name' => 'Sales Order',
-                'category' => 'Sales',
-            ])
-            ->assertForbidden();
-
-        $this->assertDatabaseMissing('numbering_modules', [
-            'code' => 'SALES_ORDER',
-        ]);
-        $this->assertDatabaseMissing('numbering_documents', [
-            'code' => 'SALES_ORDER',
-        ]);
-    }
-
-    public function test_module_registration_rejects_duplicate_codes(): void
-    {
-        $user = $this->userWithPermissions('system.settings.update');
-
-        $this->actingAs($user)
-            ->from(route('settings.edit'))
-            ->post(route('settings.modules.store'), [
-                'code' => 'VENDOR',
-                'name' => 'Duplicate Vendor',
-                'category' => 'Master Data',
-            ])
-            ->assertSessionHasErrors('code');
-
-        $this->assertDatabaseMissing('numbering_modules', [
-            'code' => 'SALES_ORDER',
-        ]);
-        $this->assertDatabaseMissing('numbering_documents', [
-            'code' => 'SALES_ORDER',
+            'is_active' => true,
         ]);
     }
 

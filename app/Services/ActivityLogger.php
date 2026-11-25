@@ -18,11 +18,12 @@ class ActivityLogger
         ?array $oldValues = null,
         ?array $newValues = null,
         ?Request $request = null,
+        bool $ignoreAuthenticatedUser = false,
     ): ActivityLog {
         $request ??= request();
 
         $activityLog = ActivityLog::create([
-            'user_id' => Auth::id(),
+            'user_id' => $ignoreAuthenticatedUser ? null : Auth::id(),
             'action' => $action,
             'module' => $module,
             'subject_type' => $subjectType,

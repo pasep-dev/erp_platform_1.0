@@ -2,9 +2,11 @@
 
 namespace App\Http\Controllers\Transaction\Inventory;
 
+use App\Enums\NumberingModuleCode;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Transaction\Inventory\MarkInventoryOpeningBalanceApprovedRequest;
 use App\Models\Master\Organization\Department;
+use App\Models\Master\Organization\Location;
 use App\Models\Master\Product\Product;
 use App\Models\Transaction\Inventory\InventoryDepartmentWarehouse;
 use App\Models\Transaction\Inventory\InventoryDocument;
@@ -12,6 +14,7 @@ use App\Models\User;
 use App\Services\ActivityLogger;
 use App\Services\Administrator\Workflow\ApprovalService;
 use App\Services\DepartmentAccessService;
+use App\Services\NumberingService;
 use App\Services\Transaction\Inventory\InventoryOpeningBalancePostingService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
@@ -35,6 +38,7 @@ class InventoryManualReceiptController extends Controller
         private readonly InventoryOpeningBalancePostingService $openingBalancePostingService,
         private readonly ActivityLogger $activityLogger,
         private readonly DepartmentAccessService $departmentAccess,
+        private readonly NumberingService $numberingService,
     ) {}
 
     public function create(Request $request): Response
@@ -79,12 +83,12 @@ class InventoryManualReceiptController extends Controller
 
         $validated = $request->validate([
             'department_id' => ['required', 'string', 'size:26', Rule::exists('mst_org_departments', 'id')->whereNull('deleted_at')],
-            'location_id' => ['required', 'string', 'size:26', Rule::exists('inventory_department_warehouses', 'location_id')],
+            'location_id' => ['required', 'string', 'size:26', Rule::exists('trx_inventory_department_warehouses', 'location_id')],
             'occurred_at' => ['required', 'date'],
             'remarks' => ['required', 'string', 'max:2000'],
             'approval_mode' => ['required', Rule::in(['WORKFLOW', 'MANUAL'])],
             'items' => ['required', 'array', 'min:1', 'max:100'],
-            'items.*.product_id' => ['required', 'string', 'size:26', Rule::exists('mst_products', 'id')->where('group', 'CONSUMABLE')->where('is_active', true)->whereNull('deleted_at'), Rule::exists('product_department', 'product_id')->where('department_id', $request->input('department_id'))],
+            'items.*.product_id' => ['required', 'string', 'size:26', Rule::exists('mst_products', 'id')->where('group', 'CONSUMABLE')->where('is_active', true)->whereNull('deleted_at'), Rule::exists('mst_product_departments', 'product_id')->where('department_id', $request->input('department_id'))],
             'items.*.quantity' => ['required', 'numeric', 'gt:0', 'decimal:0,3'],
             'items.*.serial_numbers' => ['nullable', 'array', 'max:500'],
             'items.*.serial_numbers.*' => ['required', 'string', 'max:150'],
@@ -98,6 +102,10 @@ class InventoryManualReceiptController extends Controller
             ->exists()) {
             throw ValidationException::withMessages(['location_id' => 'Gudang tidak terdaftar untuk departemen ini.']);
         }
+        $department->loadMissing('company:id,code');
+        $location = Location::query()
+            ->with(['company:id,code', 'branch:id,code'])
+            ->findOrFail($validated['location_id']);
 
         $products = Product::query()
             ->whereIn('id', collect($validated['items'])->pluck('product_id')->unique())
@@ -106,11 +114,21 @@ class InventoryManualReceiptController extends Controller
         $normalizedItems = $this->normalizeItems($validated['items'], $products);
 
         try {
-            $document = DB::transaction(function () use ($validated, $department, $normalizedItems, $user): InventoryDocument {
+            $document = DB::transaction(function () use ($validated, $department, $location, $normalizedItems, $user): InventoryDocument {
                 $id = (string) Str::ulid();
                 $document = InventoryDocument::query()->create([
                     'id' => $id,
-                    'number' => 'IMR-'.now()->format('Ymd').'-'.strtoupper(substr($id, -8)),
+                    'number' => $this->numberingService->generate(
+                        NumberingModuleCode::InventoryReceipt,
+                        [
+                            'company' => $department->company?->code,
+                            'department' => $department->code,
+                            'branch' => $location->branch?->code,
+                            'location' => $location->code,
+                            'document_type' => InventoryDocument::TYPE_OPENING_BALANCE,
+                            'direction' => 'IN',
+                        ],
+                    ),
                     'department_id' => $department->id,
                     'document_type' => InventoryDocument::TYPE_OPENING_BALANCE,
                     'status' => InventoryDocument::STATUS_PENDING_APPROVAL,

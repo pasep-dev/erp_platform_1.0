@@ -1,10 +1,12 @@
 <script setup lang="ts">
+import { computed } from "vue";
 import CrudForm from "@/components/crud/CrudForm.vue";
 import AppLayout from "@/layout/AppLayout.vue";
 import MasterActiveToggle from "@/components/common/MasterActiveToggle.vue";
 import { Head, useForm } from "@inertiajs/vue3";
 import { route } from "ziggy-js";
 import { useMasterFieldFormatting } from "@/composables/useMasterFieldFormatting";
+import { useNumberingPreview } from "@/composables/useNumberingPreview";
 
 defineOptions({
     layout: AppLayout,
@@ -15,11 +17,54 @@ interface CategoryOption {
     code: string;
     name: string;
     parent_id: string | null;
+    parent: {
+        id: string;
+        code: string;
+        name: string;
+    } | null;
 }
 
 const props = defineProps<{
     categories: CategoryOption[];
 }>();
+
+const categoryGroups = computed(() => {
+    const groups = new Map<
+        string,
+        { code: string; label: string; categories: CategoryOption[] }
+    >();
+
+    for (const category of props.categories) {
+        const groupCode = category.parent?.code ?? "OTHER";
+        const group = groups.get(groupCode) ?? {
+            code: groupCode,
+            label: category.parent
+                ? `${category.parent.code} · ${category.parent.name}`
+                : "Lainnya",
+            categories: [],
+        };
+
+        group.categories.push(category);
+        groups.set(groupCode, group);
+    }
+
+    return [...groups.values()]
+        .map((group) => ({
+            ...group,
+            categories: [...group.categories].sort((left, right) =>
+                left.code.localeCompare(right.code, "id-ID", {
+                    numeric: true,
+                    sensitivity: "base",
+                }),
+            ),
+        }))
+        .sort((left, right) =>
+            left.code.localeCompare(right.code, "id-ID", {
+                numeric: true,
+                sensitivity: "base",
+            }),
+        );
+});
 
 const form = useForm({
     category_id: "",
@@ -31,6 +76,8 @@ const form = useForm({
 
 useMasterFieldFormatting(form);
 
+const { enabled: typeNumberingEnabled, preview: typeCodePreview, loading: typeCodeLoading } = useNumberingPreview("PRODUCT_TYPE");
+
 const submit = () => {
     form.post(route("master.product.types.store"));
 };
@@ -41,13 +88,12 @@ const cancel = () => {
 </script>
 
 <template>
-    <Head title="Tambah Asset Type" />
+    <Head title="Add Types" />
 
     <CrudForm
-        title="Tambah Asset Type"
-        description="Tambahkan jenis aset baru ke dalam kategori Asset Management."
-        submit-label="Simpan"
-        submit-processing-label="Menyimpan..."
+        title="Add Types"
+        submit-label="Submit"
+        submit-processing-label="Saving..."
         :processing="form.processing"
         @submit="submit"
         @cancel="cancel"
@@ -69,13 +115,19 @@ const cancel = () => {
                 >
                     <option value="">Pilih Category</option>
 
-                    <option
-                        v-for="category in props.categories"
-                        :key="category.id"
-                        :value="category.id"
+                    <optgroup
+                        v-for="group in categoryGroups"
+                        :key="group.code"
+                        :label="group.label"
                     >
-                        {{ category.name }} ({{ category.code }})
-                    </option>
+                        <option
+                            v-for="category in group.categories"
+                            :key="category.id"
+                            :value="category.id"
+                        >
+                            {{ category.code }} · {{ category.name }}
+                        </option>
+                    </optgroup>
                 </select>
 
                 <p
@@ -97,12 +149,19 @@ const cancel = () => {
 
                 <input
                     id="code"
-                    v-model="form.code"
+                    :value="typeCodePreview ?? ''"
                     type="text"
                     maxlength="50"
-                    placeholder="Contoh: LAPTOP"
+                    :placeholder="typeCodeLoading ? 'Memuat preview kode...' : 'Aturan numbering belum tersedia'"
                     class="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 text-sm text-gray-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 dark:border-gray-700 dark:text-white"
+                    disabled
+                    readonly
                 />
+
+                <p v-if="typeCodeLoading" class="mt-1.5 text-xs text-gray-500 dark:text-gray-400">Memuat preview kode dari Document Numbering...</p>
+                <p v-else-if="!typeNumberingEnabled" class="mt-1.5 text-xs text-amber-700 dark:text-amber-400">Aturan PRODUCT_TYPE belum aktif. Minta administrator mengaktifkannya.</p>
+                <p v-else-if="!typeCodePreview" class="mt-1.5 text-xs text-amber-700 dark:text-amber-400">Preview kode belum tersedia. Periksa aturan PRODUCT_TYPE.</p>
+                <p v-else class="mt-1.5 text-xs text-gray-500 dark:text-gray-400">Kode dibuat otomatis dan tidak dapat diubah.</p>
 
                 <p
                     v-if="form.errors.code"

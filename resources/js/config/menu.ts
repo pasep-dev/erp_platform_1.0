@@ -194,11 +194,13 @@ export const menuItems: MenuItem[] = [
                 id: "inbox",
                 label: "Inbox",
                 routeName: "approval.inbox.index",
+                permission: "approval.view",
             },
             {
                 id: "history",
                 label: "History",
                 routeName: "approval.history.index",
+                permission: "approval.view",
             },
         ],
     },

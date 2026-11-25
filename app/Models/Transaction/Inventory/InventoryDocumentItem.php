@@ -19,7 +19,7 @@ class InventoryDocumentItem extends Model
     use HasDepartmentAccessScope;
     use HasUlids;
 
-    protected $table = 'inventory_document_items';
+    protected $table = 'trx_inventory_document_items';
 
     protected $fillable = [
         'inventory_document_id',

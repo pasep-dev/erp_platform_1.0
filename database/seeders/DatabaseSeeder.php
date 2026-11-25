@@ -14,6 +14,7 @@ class DatabaseSeeder extends Seeder
         $this->call([
             RolePermissionSeeder::class,
             InventoryRequestPermissionSeeder::class,
+            NumberingModuleSeeder::class,
             MasterNumberingSeeder::class,
             PurchaseOrderNumberSeeder::class,
             AssetNumberSeeder::class,

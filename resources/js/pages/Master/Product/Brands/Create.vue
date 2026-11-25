@@ -5,11 +5,13 @@ import MasterActiveToggle from "@/components/common/MasterActiveToggle.vue";
 import { Head, useForm } from "@inertiajs/vue3";
 import { route } from "ziggy-js";
 import { useMasterFieldFormatting } from "@/composables/useMasterFieldFormatting";
+import { useNumberingPreview } from "@/composables/useNumberingPreview";
 
 interface Category {
     id: string;
     code: string;
     name: string;
+    children_count: number;
 }
 
 const props = defineProps<{
@@ -29,6 +31,8 @@ const form = useForm({
 });
 
 useMasterFieldFormatting(form);
+
+const { enabled: brandNumberingEnabled, preview: brandCodePreview, loading: brandCodeLoading } = useNumberingPreview("PRODUCT_BRAND");
 
 const submit = () => {
     form.post(route("master.product.brands.store"));
@@ -59,12 +63,19 @@ const cancel = () => {
 
                 <input
                     id="code"
-                    v-model="form.code"
+                    :value="brandCodePreview ?? ''"
                     type="text"
                     maxlength="50"
-                    placeholder="Contoh: ASUS"
+                    :placeholder="brandCodeLoading ? 'Memuat preview kode...' : 'Aturan numbering belum tersedia'"
                     class="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 text-sm text-gray-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 dark:border-gray-700 dark:text-white"
+                    disabled
+                    readonly
                 />
+
+                <p v-if="brandCodeLoading" class="mt-1.5 text-xs text-gray-500 dark:text-gray-400">Memuat preview kode dari Document Numbering...</p>
+                <p v-else-if="!brandNumberingEnabled" class="mt-1.5 text-xs text-amber-700 dark:text-amber-400">Aturan PRODUCT_BRAND belum aktif. Minta administrator mengaktifkannya.</p>
+                <p v-else-if="!brandCodePreview" class="mt-1.5 text-xs text-amber-700 dark:text-amber-400">Preview kode belum tersedia. Periksa aturan PRODUCT_BRAND.</p>
+                <p v-else class="mt-1.5 text-xs text-gray-500 dark:text-gray-400">Kode dibuat otomatis dan tidak dapat diubah.</p>
 
                 <p
                     v-if="form.errors.code"
@@ -105,9 +116,9 @@ const cancel = () => {
                     Categories <span class="text-red-500">*</span>
                 </legend>
                 <p class="mb-3 text-xs text-gray-500 dark:text-gray-400">
-                    Pilih semua kategori produk yang dibuat atau didukung brand ini.
+                    Pilih kategori utama. Brand otomatis berlaku untuk seluruh subkategori aktif di bawahnya.
                 </p>
-                <div class="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+                <div class="grid max-h-72 gap-2 overflow-y-auto pr-1 sm:grid-cols-2 xl:grid-cols-3">
                     <label
                         v-for="category in props.categories"
                         :key="category.id"
@@ -122,6 +133,9 @@ const cancel = () => {
                         <span>
                             <span class="block text-sm font-medium text-gray-800 dark:text-gray-100">{{ category.name }}</span>
                             <span class="text-xs text-gray-500 dark:text-gray-400">{{ category.code }}</span>
+                            <span v-if="category.children_count > 0" class="mt-1 block text-xs text-gray-500 dark:text-gray-400">
+                                {{ category.children_count }} subkategori aktif
+                            </span>
                         </span>
                     </label>
                 </div>

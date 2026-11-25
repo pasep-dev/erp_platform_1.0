@@ -380,9 +380,9 @@ class InventoryController extends Controller
         $perPage = in_array($requestedPerPage, [5, 15, 25, 50, 100], true) ? $requestedPerPage : 15;
 
         $branchIds = $this->branchAccess->branchIds($user);
-        $goodsReceiptRows = DB::table('inventory_receipt_integrations as integration')
-            ->join('goods_receipt_items as receipt_item', 'receipt_item.id', '=', 'integration.goods_receipt_item_id')
-            ->join('goods_receipts as goods_receipt', 'goods_receipt.id', '=', 'receipt_item.goods_receipt_id')
+        $goodsReceiptRows = DB::table('trx_inventory_receipt_integrations as integration')
+            ->join('trx_goods_receipt_items as receipt_item', 'receipt_item.id', '=', 'integration.goods_receipt_item_id')
+            ->join('trx_goods_receipts as goods_receipt', 'goods_receipt.id', '=', 'receipt_item.goods_receipt_id')
             ->join('mst_products as product', 'product.id', '=', 'integration.product_id')
             ->leftJoin('mst_org_locations as warehouse', 'warehouse.id', '=', 'integration.location_id')
             ->whereIn('warehouse.branch_id', $branchIds)
@@ -404,7 +404,7 @@ class InventoryController extends Controller
             ->selectRaw('1 as item_count')
             ->selectRaw('CAST(NULL AS VARCHAR) as approval_mode');
 
-        $manualReceiptRows = DB::table('inventory_documents as document')
+        $manualReceiptRows = DB::table('trx_inventory_documents as document')
             ->leftJoin('mst_org_locations as warehouse', 'warehouse.id', '=', 'document.source_location_id')
             ->whereIn('warehouse.branch_id', $branchIds)
             ->where('document.document_type', InventoryDocument::TYPE_OPENING_BALANCE)
@@ -423,9 +423,9 @@ class InventoryController extends Controller
             ->addSelect('document.occurred_at as occurred_at')
             ->selectRaw("'MANUAL_RECEIPT' as record_type")
             ->selectSub(
-                DB::table('inventory_document_items')
+                DB::table('trx_inventory_document_items')
                     ->selectRaw('COUNT(*)')
-                    ->whereColumn('inventory_document_items.inventory_document_id', 'document.id'),
+                    ->whereColumn('trx_inventory_document_items.inventory_document_id', 'document.id'),
                 'item_count',
             )
             ->selectRaw('CAST(NULL AS VARCHAR) as approval_mode');
@@ -531,7 +531,6 @@ class InventoryController extends Controller
         abort_unless($user?->can('consumable.update'), 403);
         abort_unless($this->canAccessDepartment($user, $department), 404);
         abort_unless($product->group === 'CONSUMABLE', 404);
-        abort_unless($product->branches()->whereKey($location->branch_id)->exists(), 404);
         abort_unless(InventoryDepartmentWarehouse::query()
             ->where('department_id', $department->id)
             ->where('location_id', $location->id)
@@ -727,7 +726,7 @@ class InventoryController extends Controller
             'occurred_at' => ['required', 'date'],
             'remarks' => ['nullable', 'string', 'max:2000'],
             'items' => ['required', 'array', 'min:1', 'max:100'],
-            'items.*.product_id' => ['required', 'string', 'size:26', Rule::exists('mst_products', 'id')->where('group', 'CONSUMABLE')->where('is_active', true)->whereNull('deleted_at'), Rule::exists('product_department', 'product_id')->where('department_id', $request->input('department_id'))],
+            'items.*.product_id' => ['required', 'string', 'size:26', Rule::exists('mst_products', 'id')->where('group', 'CONSUMABLE')->where('is_active', true)->whereNull('deleted_at'), Rule::exists('mst_product_departments', 'product_id')->where('department_id', $request->input('department_id'))],
             'items.*.quantity' => ['required', 'numeric', 'gt:0', 'decimal:0,3'],
             'items.*.serial_numbers' => ['nullable', 'array', 'max:500'],
             'items.*.serial_numbers.*' => ['required', 'string', 'max:150'],
@@ -739,7 +738,7 @@ class InventoryController extends Controller
                 'source_location_id' => ['required', 'string', 'size:26'],
                 'items.*.party_type' => ['required', Rule::in(['USER', 'ASSET', 'LOCATION'])],
                 'items.*.party_user_id' => ['nullable', 'integer', Rule::exists('users', 'id')],
-                'items.*.party_asset_id' => ['nullable', 'string', 'size:26', Rule::exists('assets', 'id')],
+                'items.*.party_asset_id' => ['nullable', 'string', 'size:26', Rule::exists('trx_assets', 'id')],
                 'items.*.party_location_id' => ['nullable', 'string', 'size:26', Rule::exists('mst_org_locations', 'id')],
                 'items.*.specification_changes' => ['nullable', 'array', 'max:30'],
                 'items.*.specification_changes.*' => ['nullable', 'string', 'max:150'],
@@ -755,9 +754,9 @@ class InventoryController extends Controller
                 'items.*.party_type' => ['required', Rule::in(['USER', 'ASSET', 'LOCATION'])],
                 'items.*.reason' => ['required', 'string', 'max:1000'],
                 'items.*.party_user_id' => ['nullable', 'integer', Rule::exists('users', 'id')],
-                'items.*.party_asset_id' => ['nullable', 'string', 'size:26', Rule::exists('assets', 'id')],
+                'items.*.party_asset_id' => ['nullable', 'string', 'size:26', Rule::exists('trx_assets', 'id')],
                 'items.*.party_location_id' => ['nullable', 'string', 'size:26', Rule::exists('mst_org_locations', 'id')],
-                'items.*.related_issue_item_id' => ['nullable', 'string', 'size:26', Rule::exists('inventory_document_items', 'id')],
+                'items.*.related_issue_item_id' => ['nullable', 'string', 'size:26', Rule::exists('trx_inventory_document_items', 'id')],
             ];
         } else {
             $rules += [

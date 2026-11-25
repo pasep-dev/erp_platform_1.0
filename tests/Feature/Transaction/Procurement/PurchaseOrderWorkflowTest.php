@@ -17,6 +17,7 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
+use Inertia\Testing\AssertableInertia as Assert;
 use Spatie\Permission\Models\Permission;
 use Tests\TestCase;
 
@@ -154,11 +155,11 @@ class PurchaseOrderWorkflowTest extends TestCase
             ->assertRedirect(route('transaction.procurement.purchase-requests.show', $purchaseRequest))
             ->assertSessionHasNoErrors();
 
-        $this->assertDatabaseHas('purchase_requests', [
+        $this->assertDatabaseHas('trx_purchase_requests', [
             'id' => $purchaseRequest->id,
             'status' => 'APPROVED',
         ]);
-        $this->assertDatabaseCount('purchase_orders', 1);
+        $this->assertDatabaseCount('trx_purchase_orders', 1);
 
         $purchaseOrder = PurchaseOrder::query()->with('items')->firstOrFail();
         $this->assertSame('DRAFT', $purchaseOrder->status);
@@ -167,6 +168,12 @@ class PurchaseOrderWorkflowTest extends TestCase
         $this->assertSame('100000.00', $purchaseOrder->items->first()->unit_price);
         $this->assertSame('100000.00', $purchaseOrder->items->first()->pr_estimated_unit_price);
 
+        $requester->givePermissionTo(
+            Permission::query()->create([
+                'name' => 'purchase-order.view',
+                'guard_name' => 'web',
+            ]),
+        );
         $requester->givePermissionTo(
             Permission::query()->create([
                 'name' => 'purchase-order.update',
@@ -187,6 +194,22 @@ class PurchaseOrderWorkflowTest extends TestCase
         );
 
         $orderItem = $purchaseOrder->items->firstOrFail();
+        $this->actingAs($requester)
+            ->get(route('transaction.procurement.purchase-orders.show', $purchaseOrder))
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Transaction/Procurement/PurchaseOrder/Show')
+                ->where('purchaseOrder.id', $purchaseOrder->id));
+
+        $this->actingAs($requester)
+            ->get(route('transaction.procurement.purchase-orders.show', [
+                'purchaseOrder' => $purchaseOrder,
+                'print' => 1,
+                'closeAfterPrint' => 1,
+            ]))
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Transaction/Procurement/PurchaseOrder/Show')
+                ->where('purchaseOrder.id', $purchaseOrder->id));
+
         $this->actingAs($requester)
             ->put(route('transaction.procurement.purchase-orders.update', $purchaseOrder), [
                 'items' => [[
@@ -209,13 +232,13 @@ class PurchaseOrderWorkflowTest extends TestCase
             ->assertRedirect(route('transaction.procurement.purchase-orders.show', $purchaseOrder))
             ->assertSessionHasNoErrors();
 
-        $this->assertDatabaseHas('purchase_order_items', [
+        $this->assertDatabaseHas('trx_purchase_order_items', [
             'id' => $orderItem->id,
             'pr_estimated_unit_price' => 100000,
             'unit_price' => 125000,
             'description' => 'Preventive service',
         ]);
-        $this->assertDatabaseHas('purchase_order_item_price_histories', [
+        $this->assertDatabaseHas('trx_purchase_order_item_price_histories', [
             'purchase_order_item_id' => $orderItem->id,
             'previous_unit_price' => 100000,
             'new_unit_price' => 125000,
@@ -227,7 +250,7 @@ class PurchaseOrderWorkflowTest extends TestCase
             ->post(route('transaction.procurement.purchase-orders.submit', $purchaseOrder))
             ->assertRedirect(route('transaction.procurement.purchase-orders.show', $purchaseOrder));
 
-        $this->assertDatabaseHas('purchase_orders', [
+        $this->assertDatabaseHas('trx_purchase_orders', [
             'id' => $purchaseOrder->id,
             'status' => 'SUBMITTED',
             'submitted_by' => $requester->id,
@@ -249,12 +272,12 @@ class PurchaseOrderWorkflowTest extends TestCase
             ])
             ->assertRedirect(route('transaction.procurement.purchase-orders.index'));
 
-        $this->assertDatabaseHas('purchase_orders', [
+        $this->assertDatabaseHas('trx_purchase_orders', [
             'id' => $purchaseOrder->id,
             'status' => 'CANCELLED',
             'cancellation_reason' => 'Vendor tidak dapat memenuhi jadwal.',
         ]);
-        $this->assertDatabaseHas('purchase_requests', [
+        $this->assertDatabaseHas('trx_purchase_requests', [
             'id' => $purchaseRequest->id,
             'status' => 'APPROVED',
         ]);

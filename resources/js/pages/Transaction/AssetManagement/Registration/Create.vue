@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { computed, nextTick } from 'vue'
+import { computed, nextTick, watch } from 'vue'
 import { router, useForm } from '@inertiajs/vue3'
 import { route } from 'ziggy-js'
 import AppLayout from '@/layout/AppLayout.vue'
 import AssetManagementPageHeader from '@/components/asset/AssetManagementPageHeader.vue'
 import Button from 'primevue/button'
+import Select from 'primevue/select'
 
 defineOptions({ layout: AppLayout })
 
@@ -67,9 +68,19 @@ const form = useForm({
 const filteredDepartments = computed(() => props.departments.filter((item) => item.company_id === form.company_id))
 const filteredLocations = computed(() => props.locations.filter((item) => item.company_id === form.company_id))
 const filteredProducts = computed(() => props.products.filter((product) => product.department_ids.includes(form.department_id)))
+const productOptions = computed(() => filteredProducts.value.map((product) => ({
+    ...product,
+    label: `${product.code} · ${product.name}`,
+})))
 const filteredUsers = computed(() => props.users.filter((item) => (!item.company_id || item.company_id === form.company_id) && item.department_ids.includes(form.department_id)))
 const selectedProduct = computed(() => props.products.find((item) => item.id === form.product_id))
 const validationMessages = computed(() => Object.values(form.errors).filter((message): message is string => Boolean(message)))
+
+watch(() => form.department_id, () => {
+    if (form.product_id && !filteredProducts.value.some((product) => product.id === form.product_id)) {
+        form.product_id = ''
+    }
+})
 
 function cancel(): void {
     router.get(route('transaction.asset-management.registrations.index'))
@@ -160,7 +171,7 @@ function submit(): void {
                 <div class="mt-4 grid gap-4 sm:grid-cols-2">
                     <label class="space-y-1 text-sm"><span class="font-medium">Perusahaan <b class="text-red-500">*</b></span><select v-model="form.company_id" class="h-11 w-full rounded-lg border border-gray-300 bg-white px-3 dark:border-gray-700 dark:bg-gray-900"><option value="">Pilih perusahaan</option><option v-for="company in companies" :key="company.id" :value="company.id">{{ company.name }} ({{ company.code }})</option></select><small v-if="form.errors.company_id" class="text-red-600">{{ form.errors.company_id }}</small></label>
                     <label class="space-y-1 text-sm"><span class="font-medium">Departemen <b class="text-red-500">*</b></span><select v-model="form.department_id" class="h-11 w-full rounded-lg border border-gray-300 bg-white px-3 dark:border-gray-700 dark:bg-gray-900"><option value="">Pilih departemen</option><option v-for="department in filteredDepartments" :key="department.id" :value="department.id">{{ department.name }}</option></select><small v-if="form.errors.department_id" class="text-red-600">{{ form.errors.department_id }}</small></label>
-                    <label class="space-y-1 text-sm sm:col-span-2"><span class="font-medium">Produk ASSET <b class="text-red-500">*</b></span><select v-model="form.product_id" class="h-11 w-full rounded-lg border border-gray-300 bg-white px-3 dark:border-gray-700 dark:bg-gray-900"><option value="">Pilih produk</option><option v-for="product in filteredProducts" :key="product.id" :value="product.id">{{ product.code }} · {{ product.name }}</option></select><small v-if="selectedProduct" class="block text-gray-500">{{ selectedProduct.category?.name }} · {{ selectedProduct.type?.name }} · {{ selectedProduct.brand?.name }} · {{ selectedProduct.model?.name }}</small><small v-if="form.errors.product_id" class="text-red-600">{{ form.errors.product_id }}</small></label>
+                    <label class="space-y-1 text-sm sm:col-span-2"><span class="font-medium">Produk ASSET <b class="text-red-500">*</b></span><Select v-model="form.product_id" :options="productOptions" option-label="label" option-value="id" filter show-clear :disabled="!form.department_id" placeholder="Cari kode atau nama produk" class="w-full" /><small v-if="selectedProduct" class="block text-gray-500">{{ selectedProduct.category?.name }} · {{ selectedProduct.type?.name }} · {{ selectedProduct.brand?.name }} · {{ selectedProduct.model?.name }}</small><small v-if="form.errors.product_id" class="text-red-600">{{ form.errors.product_id }}</small></label>
                     <label class="space-y-1 text-sm"><span class="font-medium">Tanggal perolehan <b class="text-red-500">*</b></span><input v-model="form.acquisition_date" type="date" class="h-11 w-full rounded-lg border border-gray-300 bg-white px-3 dark:border-gray-700 dark:bg-gray-900"><small v-if="form.errors.acquisition_date" class="text-red-600">{{ form.errors.acquisition_date }}</small></label>
                     <label class="space-y-1 text-sm"><span class="font-medium">Nilai perolehan</span><input v-model.number="form.acquisition_cost" type="number" min="0" step="0.01" class="h-11 w-full rounded-lg border border-gray-300 bg-white px-3 dark:border-gray-700 dark:bg-gray-900"><small v-if="form.errors.acquisition_cost" class="text-red-600">{{ form.errors.acquisition_cost }}</small></label>
                 </div>

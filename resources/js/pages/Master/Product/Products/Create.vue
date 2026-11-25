@@ -3,6 +3,7 @@ import { computed, watch } from "vue";
 import { useForm } from "@inertiajs/vue3";
 import { route } from "ziggy-js";
 import { useMasterFieldFormatting } from "@/composables/useMasterFieldFormatting";
+import { useNumberingPreview } from "@/composables/useNumberingPreview";
 
 import AppLayout from "@/layout/AppLayout.vue";
 import MasterActiveToggle from "@/components/common/MasterActiveToggle.vue";
@@ -16,6 +17,7 @@ interface Category {
     id: string;
     code: string;
     name: string;
+    parent_id: string | null;
 }
 
 interface Type {
@@ -23,6 +25,7 @@ interface Type {
     category_id: string;
     code: string;
     name: string;
+    category?: Category;
 }
 
 interface Brand {
@@ -51,8 +54,6 @@ interface Department {
     name: string;
 }
 
-interface Branch { id: string; name: string; code: string; }
-
 const props = defineProps<{
     categories: Category[];
     types: Type[];
@@ -60,7 +61,6 @@ const props = defineProps<{
     models: ProductModel[];
     unitsOfMeasure: UnitOfMeasure[];
     departments: Department[];
-    branches: Branch[];
 }>();
 
 const form = useForm({
@@ -74,12 +74,18 @@ const form = useForm({
     code: "",
     name: "",
     description: "",
+    image: null as File | null,
     is_active: true,
     department_ids: [] as string[],
-    branch_ids: [] as string[],
 });
 
 useMasterFieldFormatting(form);
+
+const {
+    enabled: productNumberingEnabled,
+    preview: productCodePreview,
+    loading: productCodeLoading,
+} = useNumberingPreview("PRODUCT");
 
 const inputClass = "h-11 w-full rounded-xl border border-gray-300 bg-white px-3.5 text-sm text-gray-900 outline-none transition placeholder:text-gray-400 hover:border-gray-400 focus:border-brand-700 focus:ring-2 focus:ring-brand-700/15 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-400 dark:border-gray-700 dark:bg-gray-900 dark:text-white dark:placeholder:text-gray-500 dark:hover:border-gray-600 dark:disabled:bg-gray-800";
 const labelClass = "mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-200";
@@ -90,9 +96,15 @@ const filteredTypes = computed(() =>
 );
 
 const filteredBrands = computed(() =>
-    props.brands.filter((brand) =>
-        brand.categories.some((category) => category.id === form.category_id),
-    ),
+    props.brands.filter((brand) => {
+        const category = props.categories.find((item) => item.id === form.category_id);
+        const rootCategoryId = category?.parent_id ?? category?.id;
+
+        return brand.categories.some((brandCategory) =>
+            brandCategory.id === form.category_id
+            || (brandCategory.parent_id === null && brandCategory.id === rootCategoryId),
+        );
+    }),
 );
 
 const filteredModels = computed(() =>
@@ -110,7 +122,14 @@ watch(
         }
 
         const selectedBrand = props.brands.find((item) => item.id === form.brand_id);
-        if (!categoryId || !selectedBrand?.categories.some((category) => category.id === categoryId)) {
+        const category = props.categories.find((item) => item.id === categoryId);
+        const rootCategoryId = category?.parent_id ?? category?.id;
+        const brandSupportsCategory = selectedBrand?.categories.some((brandCategory) =>
+            brandCategory.id === categoryId
+            || (brandCategory.parent_id === null && brandCategory.id === rootCategoryId),
+        );
+
+        if (!categoryId || !brandSupportsCategory) {
             form.brand_id = "";
             form.model_id = "";
         }
@@ -148,7 +167,12 @@ watch(
 );
 
 function submit(): void {
-    form.post(route("master.product.products.store"));
+    form.post(route("master.product.products.store"), { forceFormData: true });
+}
+
+function selectImage(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    form.image = input.files?.[0] ?? null;
 }
 
 function cancel(): void {
@@ -174,23 +198,17 @@ function cancel(): void {
                 </div>
 
                 <div class="grid grid-cols-1 gap-5 md:grid-cols-2">
-                    <div class="md:col-span-2">
-                        <label for="department_ids" :class="labelClass">Department pemilik <span class="text-red-500">*</span></label>
-                        <select id="department_ids" v-model="form.department_ids" multiple :class="[inputClass, 'min-h-28']" required>
-                            <option v-for="department in departments" :key="department.id" :value="department.id">{{ department.name }}</option>
-                        </select>
-                        <p class="mt-1.5 text-xs text-gray-500 dark:text-gray-400">Product hanya tersedia bagi department yang dipilih. Pilih beberapa hanya jika product memang digunakan bersama.</p>
+                    <fieldset class="md:col-span-2">
+                        <legend :class="labelClass">Department pemilik <span class="text-red-500">*</span></legend>
+                        <div class="mt-2 grid max-h-56 grid-cols-1 gap-2 overflow-y-auto rounded-xl border border-gray-300 bg-white p-3 sm:grid-cols-2 dark:border-gray-700 dark:bg-gray-900">
+                            <label v-for="department in departments" :key="department.id" class="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-2 text-sm text-gray-700 hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-800">
+                                <input v-model="form.department_ids" type="checkbox" :value="department.id" class="size-4 rounded border-gray-300 text-brand-700 focus:ring-brand-700/20 dark:border-gray-600 dark:bg-gray-800" />
+                                <span>{{ department.name }}</span>
+                            </label>
+                        </div>
+                        <p class="mt-1.5 text-xs text-gray-500 dark:text-gray-400">Katalog produk berlaku untuk semua branch. Department menentukan unit yang dapat menggunakan produk ini.</p>
                         <p v-if="form.errors.department_ids" :class="errorClass">{{ form.errors.department_ids }}</p>
-                    </div>
-
-                    <div class="md:col-span-2">
-                        <label for="branch_ids" :class="labelClass">Branch tersedia <span class="text-red-500">*</span></label>
-                        <select id="branch_ids" v-model="form.branch_ids" multiple :class="[inputClass, 'min-h-28']" required>
-                            <option v-for="branch in branches" :key="branch.id" :value="branch.id">{{ branch.code }} · {{ branch.name }}</option>
-                        </select>
-                        <p class="mt-1.5 text-xs text-gray-500 dark:text-gray-400">Pilih branch tempat produk ini boleh digunakan.</p>
-                        <p v-if="form.errors.branch_ids" :class="errorClass">{{ form.errors.branch_ids }}</p>
-                    </div>
+                    </fieldset>
 
                     <div>
                         <label for="group" :class="labelClass">Group <span class="text-red-500">*</span></label>
@@ -205,8 +223,11 @@ function cancel(): void {
 
                     <div>
                         <label for="code" :class="labelClass">Product Code</label>
-                        <input id="code" v-model="form.code" type="text" maxlength="50" placeholder="Kosongkan untuk dibuat otomatis" :class="inputClass" />
-                        <p class="mt-1.5 text-xs text-gray-500 dark:text-gray-400">Kode akan mengikuti aturan aktif pada Administrator - Document Numbering.</p>
+                        <input id="code" :value="productCodePreview ?? ''" type="text" maxlength="50" :placeholder="productCodeLoading ? 'Memuat preview kode...' : 'Aturan numbering belum tersedia'" :class="inputClass" disabled readonly />
+                        <p v-if="productCodeLoading" class="mt-1.5 text-xs text-gray-500 dark:text-gray-400">Memuat preview kode dari aturan Document Numbering...</p>
+                        <p v-else-if="!productNumberingEnabled" class="mt-1.5 text-xs text-amber-700 dark:text-amber-400">Aturan numbering PRODUCT belum aktif. Minta administrator mengaktifkannya sebelum produk disimpan.</p>
+                        <p v-else-if="!productCodePreview" class="mt-1.5 text-xs text-amber-700 dark:text-amber-400">Preview kode tidak tersedia. Periksa format numbering PRODUCT.</p>
+                        <p v-else class="mt-1.5 text-xs text-gray-500 dark:text-gray-400">Kode dibuat otomatis dari aturan aktif dan tidak dapat diubah.</p>
                         <p v-if="form.errors.code" :class="errorClass">{{ form.errors.code }}</p>
                     </div>
 
@@ -214,6 +235,14 @@ function cancel(): void {
                         <label for="name" :class="labelClass">Product Name <span class="text-red-500">*</span></label>
                         <input id="name" v-model="form.name" type="text" maxlength="150" placeholder="Contoh: Laptop bisnis 14 inci" :class="inputClass" required />
                         <p v-if="form.errors.name" :class="errorClass">{{ form.errors.name }}</p>
+                    </div>
+
+                    <div class="md:col-span-2">
+                        <label for="image" :class="labelClass">Gambar produk <span class="font-normal text-gray-400">(Opsional)</span></label>
+                        <input id="image" type="file" accept="image/jpeg,image/png,image/webp" :class="inputClass" @change="selectImage" />
+                        <p class="mt-1.5 text-xs text-gray-500 dark:text-gray-400">Format JPG, PNG, atau WebP. Maksimal 5 MB.</p>
+                        <p v-if="form.image" class="mt-1 text-xs text-gray-600 dark:text-gray-300">{{ form.image.name }}</p>
+                        <p v-if="form.errors.image" :class="errorClass">{{ form.errors.image }}</p>
                     </div>
 
                     <div v-if="form.group === 'CONSUMABLE'" class="md:col-span-2">

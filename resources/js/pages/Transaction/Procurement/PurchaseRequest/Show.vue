@@ -9,6 +9,7 @@ import Textarea from "primevue/textarea";
 import ConfirmDialog from "primevue/confirmdialog";
 import { useConfirm } from "primevue/useconfirm";
 import { route } from "ziggy-js";
+import PrintDocumentHeader from "@/components/print/PrintDocumentHeader.vue";
 
 import AppLayout from "@/layout/AppLayout.vue";
 
@@ -26,6 +27,10 @@ interface PurchaseRequestItem {
     required_date?: string | null;
     remarks?: string | null;
     tax_included: boolean;
+    tax_code?: string | null;
+    tax_name?: string | null;
+    tax_rate?: string | number | null;
+    tax_category?: "ADDITIVE" | "WITHHOLDING" | null;
     requires_po: boolean;
     product?: {
         id: string;
@@ -211,23 +216,17 @@ const subtotal = computed(() =>
     ),
 );
 
-const taxableSubtotal = computed(() =>
-    props.purchaseRequest.items.reduce(
-        (total, item) =>
-            total +
-            (item.tax_included
-                ? 0
-                : Number(item.quantity || 0) *
-                    Number(item.estimated_unit_price || 0)),
-        0,
-    ),
-);
-
-const estimatedTax = computed(() =>
-    Math.round(taxableSubtotal.value * 0.11),
-);
-
-const grandTotal = computed(() => subtotal.value + estimatedTax.value);
+const itemTaxAmount = (item: PurchaseRequestItem) => {
+    const rate = Number(item.tax_rate || 0);
+    const amount = Number(item.quantity || 0) * Number(item.estimated_unit_price || 0);
+    if (rate <= 0) return 0;
+    if (item.tax_category === "WITHHOLDING") return Math.round(amount * rate / 100);
+    return Math.round(item.tax_included ? amount * rate / (100 + rate) : amount * rate / 100);
+};
+const estimatedTax = computed(() => props.purchaseRequest.items.reduce((total, item) => total + (item.tax_category === "ADDITIVE" ? itemTaxAmount(item) : 0), 0));
+const addedTax = computed(() => props.purchaseRequest.items.reduce((total, item) => total + (item.tax_category === "ADDITIVE" && !item.tax_included ? itemTaxAmount(item) : 0), 0));
+const withholdingTax = computed(() => props.purchaseRequest.items.reduce((total, item) => total + (item.tax_category === "WITHHOLDING" ? itemTaxAmount(item) : 0), 0));
+const grandTotal = computed(() => subtotal.value + addedTax.value - withholdingTax.value);
 
 const formatPrintAmount = (value: number) =>
     new Intl.NumberFormat("id-ID", {
@@ -346,18 +345,10 @@ const editDraft = () => {
         <ConfirmDialog />
 
         <section class="purchase-request-print-sheet" aria-label="Dokumen cetak Purchase Request">
-            <header class="print-heading">
-                <h1>PURCHASE REQUEST</h1>
-            </header>
+            <PrintDocumentHeader domain="procurement" title="Purchase Request" :number="purchaseRequest.number" :company-name="purchaseRequest.company?.name ?? null" :date-label="`Tanggal permintaan · ${formatDate(purchaseRequest.request_date)}`" />
 
             <table class="print-meta-table">
                 <tbody>
-                    <tr>
-                        <th>Date</th>
-                        <td>{{ formatDate(purchaseRequest.request_date) }}</td>
-                        <th>PR No.</th>
-                        <td>{{ purchaseRequest.number }}</td>
-                    </tr>
                     <tr>
                         <th>Prepared by</th>
                         <td>{{ purchaseRequest.requester?.name ?? "-" }}</td>
@@ -632,12 +623,18 @@ const editDraft = () => {
                                     </td>
                                     <td class="max-w-xs whitespace-normal px-5 py-4 align-top text-sm text-gray-700 dark:text-gray-300">
                                         <div>{{ item.description || "Tidak ada deskripsi" }}</div>
+                                        <div v-if="item.tax_name" class="mt-2 text-xs text-blue-700 dark:text-blue-400">
+                                            {{ item.tax_code }} · {{ item.tax_name }} ({{ Number(item.tax_rate) }}%) · {{ item.tax_category === "WITHHOLDING" ? "dipotong dari pembayaran" : item.tax_included ? "sudah termasuk harga" : "ditambahkan ke harga" }}
+                                        </div>
                                         <div v-if="item.required_date" class="mt-2 text-sm text-gray-500 dark:text-gray-400">
                                             Dibutuhkan {{ formatDate(item.required_date) }}
                                         </div>
                                         <div class="mt-1 flex flex-wrap gap-1.5">
                                             <span v-if="item.tax_included" class="rounded bg-emerald-50 px-2 py-1 text-xs font-medium text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400">
-                                                Termasuk PPN
+                                                Harga termasuk {{ item.tax_name ?? 'pajak' }}
+                                            </span>
+                                            <span v-if="item.tax_name" class="rounded bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700 dark:bg-blue-500/10 dark:text-blue-400">
+                                                {{ item.tax_code }} {{ Number(item.tax_rate ?? 0) }}% · {{ item.tax_category === 'WITHHOLDING' ? 'Potong' : 'Pajak' }}
                                             </span>
                                             <span v-if="item.requires_po" class="rounded bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700 dark:bg-blue-500/10 dark:text-blue-400">
                                                 Perlu PO
@@ -830,10 +827,14 @@ const editDraft = () => {
                             </dd>
                         </div>
                         <div class="flex items-center justify-between py-3">
-                            <dt class="text-sm text-gray-500 dark:text-gray-400">Estimasi PPN 11%</dt>
+                            <dt class="text-sm text-gray-500 dark:text-gray-400">Pajak tambahan (termasuk dalam harga jika dicentang)</dt>
                             <dd class="text-right text-sm font-medium tabular-nums text-gray-900 dark:text-white">
                                 {{ hasMissingPrices ? "-" : formatCurrency(estimatedTax) }}
                             </dd>
+                        </div>
+                        <div class="flex items-center justify-between py-3">
+                            <dt class="text-sm text-gray-500 dark:text-gray-400">Pajak potong</dt>
+                            <dd class="text-right text-sm font-medium tabular-nums text-gray-900 dark:text-white">{{ hasMissingPrices ? "-" : `−${formatCurrency(withholdingTax)}` }}</dd>
                         </div>
                         <div class="flex items-center justify-between gap-3 border-t border-gray-200 py-4 dark:border-gray-800">
                             <dt class="text-sm font-semibold text-gray-900 dark:text-white">Total Estimasi</dt>
@@ -995,18 +996,6 @@ const editDraft = () => {
         font-size: 8pt;
     }
 
-    .print-heading {
-        margin-bottom: 5mm;
-        text-align: center;
-    }
-
-    .print-heading h1 {
-        margin: 0;
-        font-size: 12pt;
-        font-weight: 700;
-        letter-spacing: 0.4px;
-    }
-
     .print-meta-table,
     .print-items-table,
     .print-approval-table {
@@ -1072,7 +1061,7 @@ const editDraft = () => {
 
     .print-items-table thead,
     .print-approval-table thead {
-        background: var(--color-brand-700, #9e2d9e) !important;
+        background: #1e3a8a !important;
         color: #fff !important;
     }
 

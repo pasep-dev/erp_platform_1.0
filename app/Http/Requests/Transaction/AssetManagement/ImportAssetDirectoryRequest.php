@@ -8,7 +8,7 @@ class ImportAssetDirectoryRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return $this->user()?->can('asset.create') ?? false;
+        return $this->user()?->can('registration.create') ?? false;
     }
 
     /** @return array<string, array<int, string>> */

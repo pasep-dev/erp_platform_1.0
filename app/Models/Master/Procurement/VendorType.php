@@ -4,14 +4,14 @@ namespace App\Models\Master\Procurement;
 
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class VendorType extends Model
 {
     use HasUlids, SoftDeletes;
 
-    protected $table = 'mst_vendor_types';
+    protected $table = 'mst_prc_vendor_types';
 
     protected $fillable = [
         'code',

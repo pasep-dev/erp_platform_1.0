@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Settings;
 
+use App\Enums\NumberingModuleCode;
 use App\Http\Controllers\Controller;
 use App\Models\NumberingModule;
 use App\Models\Setting;
@@ -75,6 +76,7 @@ class SettingsController extends Controller
                 'backups' => $backups->listBackups($backupDirectory),
             ],
             'modules' => NumberingModule::query()
+                ->whereIn('code', NumberingModuleCode::values())
                 ->orderBy('category')
                 ->orderBy('name')
                 ->get([

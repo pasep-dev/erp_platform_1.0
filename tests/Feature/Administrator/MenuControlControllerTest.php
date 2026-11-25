@@ -43,6 +43,39 @@ class MenuControlControllerTest extends TestCase
         );
     }
 
+    public function test_owner_role_menu_visibility_can_be_configured(): void
+    {
+        $administrator = $this->administrator();
+        $ownerRole = Role::query()->create([
+            'name' => 'Owner',
+            'guard_name' => 'web',
+        ]);
+
+        $this->actingAs($administrator)
+            ->get(route('administrator.menu-control.edit', [
+                'type' => 'role',
+                'target' => $ownerRole->id,
+            ]))
+            ->assertInertia(fn (AssertableInertia $page) => $page
+                ->where('canEdit', true));
+
+        $this->actingAs($administrator)
+            ->put(route('administrator.menu-control.update', [
+                'type' => 'role',
+                'target' => $ownerRole->id,
+            ]), [
+                'menu_keys' => ['dashboard', 'inbox', 'history', 'registration', 'inventory-overview'],
+            ])
+            ->assertRedirect(route('administrator.menu-control.index', ['type' => 'role']));
+
+        $this->assertSame(
+            ['dashboard', 'inbox', 'history', 'registration', 'inventory-overview'],
+            app(MenuVisibilityService::class)->visibleMenuKeysFor(
+                tap(User::factory()->create(), fn (User $owner) => $owner->assignRole($ownerRole)),
+            ),
+        );
+    }
+
     public function test_administrator_can_view_the_role_and_user_menu_control_lists(): void
     {
         $administrator = $this->administrator();

@@ -46,16 +46,12 @@ class AccessControlController extends Controller
                     'type' => 'role',
                     'identifier' => null,
                     'permissions_count' => $role->permissions_count,
-                    'is_system' => in_array($role->name, ['Administrator', 'Owner'], true),
-                    'is_editable' => ! in_array($role->name, ['Administrator', 'Owner'], true),
+                    'is_system' => $role->name === 'Administrator',
+                    'is_editable' => $role->name !== 'Administrator',
                 ]);
         } else {
             $targets = User::query()
-                ->withCount([
-                    'permissions as direct_permissions_count' => fn (Builder $query) => $query
-                        ->where('guard_name', 'web'),
-                ])
-                ->with('roles:id,name')
+                ->with(['permissions:id', 'roles:id,name', 'roles.permissions:id'])
                 ->when($search, function (Builder $query, string $search): void {
                     $query->where(function (Builder $query) use ($search): void {
                         $query->where('name', 'like', "%{$search}%")
@@ -72,9 +68,12 @@ class AccessControlController extends Controller
                     'type' => 'user',
                     'identifier' => $user->email,
                     'roles' => $user->roles->pluck('name')->all(),
-                    'permissions_count' => $user->direct_permissions_count,
-                    'is_system' => $user->hasGlobalDepartmentAccess(),
-                    'is_editable' => ! $user->hasGlobalDepartmentAccess(),
+                    'permissions_count' => $user->permissions
+                        ->merge($user->roles->flatMap->permissions)
+                        ->unique('id')
+                        ->count(),
+                    'is_system' => $user->isAdministrator(),
+                    'is_editable' => ! $user->isAdministrator(),
                 ]);
         }
 
@@ -95,8 +94,8 @@ class AccessControlController extends Controller
 
         $subject = $this->findSubject($type, $target);
         $isAdministrator = $type === 'role'
-            ? in_array($subject->name, ['Administrator', 'Owner'], true)
-            : $subject->hasRole(['Administrator', 'Owner']);
+            ? $subject->name === 'Administrator'
+            : $subject->isAdministrator();
 
         $permissions = Permission::query()
             ->where('guard_name', 'web')
@@ -144,8 +143,8 @@ class AccessControlController extends Controller
         $subject = $this->findSubject($type, $target);
         abort_if(
             $type === 'role'
-                ? in_array($subject->name, ['Administrator', 'Owner'], true)
-                : $subject->hasRole(['Administrator', 'Owner']),
+                ? $subject->name === 'Administrator'
+                : $subject->isAdministrator(),
             403,
         );
 

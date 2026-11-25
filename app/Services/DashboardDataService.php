@@ -14,6 +14,7 @@ use App\Models\Transaction\Inventory\InventoryStockMovement;
 use App\Models\Transaction\Inventory\InventoryStockThreshold;
 use App\Models\Transaction\Procurement\GoodsReceipt;
 use App\Models\Transaction\Procurement\PurchaseOrder;
+use App\Models\Transaction\Procurement\PurchaseRequest;
 use App\Models\User;
 use App\Services\Administrator\Workflow\ApprovalService;
 use Illuminate\Database\Query\JoinClause;
@@ -44,37 +45,53 @@ class DashboardDataService
      *     pipeline: array<int, array{label: string, value: int}>
      * }
      */
-    public function forUser(User $user): array
+    public function forUser(User $user, ?string $requestedDepartmentId = null): array
     {
-        $approvalInbox = $this->approvalService->inbox($user);
+        $departments = Department::query()
+            ->whereIn('id', $this->departmentAccess->departmentIds($user))
+            ->orderBy('code')
+            ->get(['id', 'code', 'name']);
+        $selectedDepartmentId = $departments->contains('id', $requestedDepartmentId)
+            ? $requestedDepartmentId
+            : $departments->first()?->id;
+        $approvalInbox = $selectedDepartmentId === null
+            ? collect()
+            : $this->approvalService->inbox($user, $selectedDepartmentId);
         $canViewAssets = $user->can('asset.view');
         $canViewPurchaseOrders = $user->can('purchase-order.view');
         $canViewPurchaseRequests = $user->can('purchase-request.view');
         $canViewGoodsReceipts = $user->can('good-receipt.view');
         $canViewInventory = $user->can('consumable.view');
 
-        $openPurchaseOrders = $canViewPurchaseOrders
+        $openPurchaseOrders = $canViewPurchaseOrders && $selectedDepartmentId !== null
             ? PurchaseOrder::query()
+                ->where('department_id', $selectedDepartmentId)
                 ->whereIn('status', ['SUBMITTED', 'PARTIALLY_RECEIVED'])
                 ->count()
             : 0;
-        $totalAssets = $canViewAssets ? Asset::query()->count() : 0;
-        $inMaintenance = $canViewAssets
+        $totalAssets = $canViewAssets && $selectedDepartmentId !== null
+            ? Asset::query()->where('department_id', $selectedDepartmentId)->count()
+            : 0;
+        $inMaintenance = $canViewAssets && $selectedDepartmentId !== null
             ? Asset::query()
+                ->where('department_id', $selectedDepartmentId)
                 ->where('status', Asset::STATUS_ACTIVE)
                 ->whereHas('maintenanceRecords', fn ($query) => $query
                     ->where('status', AssetMaintenanceRecord::STATUS_IN_PROGRESS))
                 ->count()
             : 0;
-        $openIncidents = $canViewAssets
+        $openIncidents = $canViewAssets && $selectedDepartmentId !== null
             ? AssetIncident::query()
+                ->whereHas('asset', fn ($query) => $query->where('department_id', $selectedDepartmentId))
                 ->whereIn('status', [
                     AssetIncident::STATUS_REPORTED,
                     AssetIncident::STATUS_INVESTIGATING,
                 ])
                 ->count()
             : 0;
-        $lowStock = $canViewInventory ? $this->lowStockCount($user) : 0;
+        $lowStock = $canViewInventory && $selectedDepartmentId !== null
+            ? $this->lowStockCount($selectedDepartmentId)
+            : 0;
 
         return [
             'stats' => [
@@ -94,21 +111,33 @@ class DashboardDataService
                 'inventory' => $canViewInventory,
                 'admin' => $user->can('approval.workflow.view'),
             ],
+            'departments' => $departments->map(fn (Department $department): array => [
+                'id' => (string) $department->id,
+                'code' => $department->code,
+                'name' => $department->name,
+            ])->all(),
+            'selectedDepartmentId' => $selectedDepartmentId !== null
+                ? (string) $selectedDepartmentId
+                : null,
             'approvals' => $this->approvalRows($approvalInbox),
             'alerts' => $this->alerts(
                 $canViewAssets,
                 $canViewPurchaseOrders,
                 $canViewInventory,
+                $selectedDepartmentId,
                 $openPurchaseOrders,
                 $lowStock,
                 $openIncidents,
             ),
             'activities' => $this->recentActivity($user),
-            'assetStatus' => $canViewAssets ? $this->assetStatus() : $this->emptyAssetStatus(),
+            'assetStatus' => $canViewAssets && $selectedDepartmentId !== null
+                ? $this->assetStatus($selectedDepartmentId)
+                : $this->emptyAssetStatus(),
             'pipeline' => $this->procurementPipeline(
                 $canViewPurchaseRequests,
                 $canViewPurchaseOrders,
                 $canViewGoodsReceipts,
+                $selectedDepartmentId,
                 $openPurchaseOrders,
             ),
         ];
@@ -139,9 +168,11 @@ class DashboardDataService
     }
 
     /** @return array<int, array{label: string, value: int, color: string}> */
-    private function assetStatus(): array
+    private function assetStatus(string $departmentId): array
     {
-        $activeAssets = Asset::query()->where('status', Asset::STATUS_ACTIVE);
+        $activeAssets = Asset::query()
+            ->where('department_id', $departmentId)
+            ->where('status', Asset::STATUS_ACTIVE);
         $inMaintenance = (clone $activeAssets)
             ->whereHas('maintenanceRecords', fn ($query) => $query
                 ->where('status', AssetMaintenanceRecord::STATUS_IN_PROGRESS))
@@ -156,7 +187,9 @@ class DashboardDataService
             ->whereDoesntHave('maintenanceRecords', fn ($query) => $query
                 ->where('status', AssetMaintenanceRecord::STATUS_IN_PROGRESS))
             ->count();
-        $other = Asset::query()->count() - $inMaintenance - $inUse - $available;
+        $other = Asset::query()
+            ->where('department_id', $departmentId)
+            ->count() - $inMaintenance - $inUse - $available;
 
         return [
             ['label' => 'In use', 'value' => $inUse, 'color' => 'bg-brand-700'],
@@ -186,12 +219,16 @@ class DashboardDataService
         bool $canViewPurchaseRequests,
         bool $canViewPurchaseOrders,
         bool $canViewGoodsReceipts,
+        ?string $departmentId,
         int $openPurchaseOrders,
     ): array {
-        $requestsAwaitingApproval = $canViewPurchaseRequests
+        $requestsAwaitingApproval = $canViewPurchaseRequests && $departmentId !== null
             ? ApprovalRequest::query()
                 ->where('module', 'PURCHASE_REQUEST')
                 ->where('status', ApprovalStatus::PENDING)
+                ->whereIn('document_id', PurchaseRequest::query()
+                    ->where('department_id', $departmentId)
+                    ->select('id'))
                 ->count()
             : 0;
 
@@ -200,8 +237,11 @@ class DashboardDataService
             ['label' => 'Purchase orders in progress', 'value' => $canViewPurchaseOrders ? $openPurchaseOrders : 0],
             [
                 'label' => 'Goods receipts awaiting posting',
-                'value' => $canViewGoodsReceipts
-                    ? GoodsReceipt::query()->where('status', GoodsReceipt::STATUS_DRAFT)->count()
+                'value' => $canViewGoodsReceipts && $departmentId !== null
+                    ? GoodsReceipt::query()
+                        ->where('department_id', $departmentId)
+                        ->where('status', GoodsReceipt::STATUS_DRAFT)
+                        ->count()
                     : 0,
             ],
         ];
@@ -214,6 +254,7 @@ class DashboardDataService
         bool $canViewAssets,
         bool $canViewPurchaseOrders,
         bool $canViewInventory,
+        ?string $departmentId,
         int $openPurchaseOrders,
         int $lowStock,
         int $openIncidents,
@@ -229,8 +270,9 @@ class DashboardDataService
             ];
         }
 
-        if ($canViewAssets) {
+        if ($canViewAssets && $departmentId !== null) {
             $dueMaintenance = AssetMaintenanceRecord::query()
+                ->whereHas('asset', fn ($query) => $query->where('department_id', $departmentId))
                 ->whereIn('status', [
                     AssetMaintenanceRecord::STATUS_READY_TO_START,
                     AssetMaintenanceRecord::STATUS_IN_PROGRESS,
@@ -289,17 +331,9 @@ class DashboardDataService
             ->all();
     }
 
-    private function lowStockCount(User $user): int
+    private function lowStockCount(string $departmentId): int
     {
-        $departments = Department::query();
-
-        $this->departmentAccess->scopeDepartments($departments, $user);
-
-        $departmentIds = $departments->pluck('id');
-
-        if ($departmentIds->isEmpty()) {
-            return 0;
-        }
+        $departmentIds = [$departmentId];
 
         $balances = InventoryStockMovement::query()
             ->select(['department_id', 'location_id', 'product_id'])
@@ -308,21 +342,21 @@ class DashboardDataService
             ->groupBy('department_id', 'location_id', 'product_id');
 
         return InventoryStockThreshold::query()
-            ->whereIn('inventory_stock_thresholds.department_id', $departmentIds)
+            ->whereIn('trx_inventory_stock_thresholds.department_id', $departmentIds)
             ->whereHas('product', fn ($query) => $query
                 ->where('group', 'CONSUMABLE')
                 ->where('is_active', true))
             ->whereExists(fn ($query) => $query
                 ->selectRaw('1')
-                ->from('inventory_department_warehouses as warehouses')
-                ->whereColumn('warehouses.department_id', 'inventory_stock_thresholds.department_id')
-                ->whereColumn('warehouses.location_id', 'inventory_stock_thresholds.location_id'))
+                ->from('trx_inventory_department_warehouses as warehouses')
+                ->whereColumn('warehouses.department_id', 'trx_inventory_stock_thresholds.department_id')
+                ->whereColumn('warehouses.location_id', 'trx_inventory_stock_thresholds.location_id'))
             ->leftJoinSub($balances, 'stock_balances', function (JoinClause $join): void {
-                $join->on('stock_balances.department_id', '=', 'inventory_stock_thresholds.department_id')
-                    ->on('stock_balances.location_id', '=', 'inventory_stock_thresholds.location_id')
-                    ->on('stock_balances.product_id', '=', 'inventory_stock_thresholds.product_id');
+                $join->on('stock_balances.department_id', '=', 'trx_inventory_stock_thresholds.department_id')
+                    ->on('stock_balances.location_id', '=', 'trx_inventory_stock_thresholds.location_id')
+                    ->on('stock_balances.product_id', '=', 'trx_inventory_stock_thresholds.product_id');
             })
-            ->whereRaw('COALESCE(stock_balances.balance, 0) < inventory_stock_thresholds.minimum_quantity')
+            ->whereRaw('COALESCE(stock_balances.balance, 0) < trx_inventory_stock_thresholds.minimum_quantity')
             ->count();
     }
 }

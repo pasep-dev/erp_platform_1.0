@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Administrator;
 
+use App\Enums\NumberingModuleCode;
 use App\Models\NumberingDocument;
 use App\Models\NumberingModule;
 use Illuminate\Foundation\Http\FormRequest;
@@ -35,6 +36,9 @@ class NumberingDocumentRequest extends FormRequest
             NumberingDocument::GENERATED_MASTER_CODES,
             true,
         );
+        $numberingModuleCode = NumberingModuleCode::tryFrom((string) $this->input('code'));
+        $allowedPlaceholders = $numberingModuleCode?->supportedPlaceholders()
+            ?? NumberingDocument::SUPPORTED_PLACEHOLDERS;
         $codeRules = [
             'required',
             'string',
@@ -47,6 +51,7 @@ class NumberingDocumentRequest extends FormRequest
         if ($this->isMethod('POST')) {
             $codeRules[] = Rule::in(
                 NumberingModule::query()
+                    ->whereIn('code', NumberingModuleCode::values())
                     ->where('is_active', true)
                     ->pluck('code')
                     ->all(),
@@ -78,6 +83,7 @@ class NumberingDocumentRequest extends FormRequest
                 $isGeneratedMasterCode ? 'max:43' : 'max:255',
                 function (string $attribute, mixed $value, callable $fail) use (
                     $isGeneratedMasterCode,
+                    $allowedPlaceholders,
                 ): void {
                     if (! is_string($value)) {
                         return;
@@ -90,7 +96,7 @@ class NumberingDocumentRequest extends FormRequest
                     );
                     $allowedTokens = array_map(
                         static fn (string $placeholder): string => '{'.$placeholder.'}',
-                        NumberingDocument::SUPPORTED_PLACEHOLDERS,
+                        $allowedPlaceholders,
                     );
                     $unmatchedBraces = preg_replace(
                         '/\{[A-Z_]+\}/',
@@ -108,7 +114,7 @@ class NumberingDocumentRequest extends FormRequest
                     }
 
                     if (array_diff($tokens, $allowedTokens) !== []) {
-                        $fail('Pattern contains an unsupported placeholder.');
+                        $fail('Pattern contains a placeholder unavailable for the selected module.');
 
                         return;
                     }
@@ -160,6 +166,17 @@ class NumberingDocumentRequest extends FormRequest
             'is_active' => [
                 'required',
                 'boolean',
+                function (string $attribute, mixed $value, callable $fail) use (
+                    $numberingDocument,
+                ): void {
+                    if (
+                        $numberingDocument instanceof NumberingDocument
+                        && NumberingModuleCode::tryFrom($numberingDocument->code) === null
+                        && filter_var($value, FILTER_VALIDATE_BOOLEAN)
+                    ) {
+                        $fail('Document numbering cannot be enabled for an unintegrated module.');
+                    }
+                },
             ],
         ];
     }

@@ -11,6 +11,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class InventoryRequestItem extends Model
 {
+    protected $table = 'trx_inventory_request_items';
+
     use HasBranchAccessScope;
     use HasDepartmentAccessScope;
     use HasUlids;

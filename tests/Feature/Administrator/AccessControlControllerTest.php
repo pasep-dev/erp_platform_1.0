@@ -72,6 +72,38 @@ class AccessControlControllerTest extends TestCase
                 ->where('assignedPermissionIds', [$permission->id]));
     }
 
+    public function test_owner_role_permissions_can_be_reviewed_and_changed(): void
+    {
+        $administrator = $this->administrator();
+        $ownerRole = Role::query()->create([
+            'name' => 'Owner',
+            'guard_name' => 'web',
+        ]);
+        $permission = $this->permission('asset.view');
+        $ownerRole->givePermissionTo($permission);
+
+        $this->actingAs($administrator)
+            ->get(route('administrator.access-control.edit', [
+                'type' => 'role',
+                'target' => $ownerRole->id,
+            ]))
+            ->assertInertia(fn (AssertableInertia $page) => $page
+                ->where('canEdit', true)
+                ->where('assignedPermissionIds', [$permission->id]));
+
+        $this->actingAs($administrator)
+            ->put(route('administrator.access-control.update', [
+                'type' => 'role',
+                'target' => $ownerRole->id,
+            ]), [
+                'permission_ids' => [$this->permission('consumable.view')->id],
+            ])
+            ->assertRedirect(route('administrator.access-control.index', ['type' => 'role']));
+
+        $this->assertTrue($ownerRole->fresh()->hasPermissionTo('consumable.view'));
+        $this->assertFalse($ownerRole->fresh()->hasPermissionTo('asset.view'));
+    }
+
     public function test_administrator_can_assign_permissions_directly_to_a_user(): void
     {
         $administrator = $this->administrator();

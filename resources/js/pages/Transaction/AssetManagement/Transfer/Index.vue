@@ -17,7 +17,7 @@ interface Transfer {
     reason: string
     from_snapshot: Record<string, string | number | null>
     to_snapshot: Record<string, string | number | null>
-    asset: { id: string; number: string; product: { code: string; name: string } }
+    asset: { id: string; number: string; product: { code: string; name: string } | null } | null
     performed_by: { name: string } | null
 }
 
@@ -56,7 +56,7 @@ function date(value: string): string {
                     <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
                         <tr v-for="transfer in transfers.data" :key="transfer.id" class="text-gray-700 dark:text-gray-200">
                             <td class="px-4 py-3"><Link :href="route('transaction.asset-management.transfers.show', transfer.id)" class="font-semibold text-purple-700 hover:underline dark:text-purple-300">{{ transfer.number }}</Link><div class="mt-1 text-xs text-gray-500">{{ date(transfer.effective_at) }}</div></td>
-                            <td class="px-4 py-3"><div class="font-medium">{{ transfer.asset.number }}</div><div class="text-xs text-gray-500">{{ transfer.asset.product.name }} · {{ transfer.asset.product.code }}</div></td>
+                            <td class="px-4 py-3"><div class="font-medium">{{ transfer.asset?.number ?? 'Aset tidak tersedia' }}</div><div class="text-xs text-gray-500">{{ transfer.asset?.product?.name ?? 'Produk tidak tersedia' }}<template v-if="transfer.asset?.product?.code"> · {{ transfer.asset.product.code }}</template></div></td>
                             <td class="px-4 py-3 text-xs">{{ transfer.from_snapshot.company }}<div class="mt-1 text-gray-500">{{ transfer.from_snapshot.department }} · {{ transfer.from_snapshot.location }}</div></td>
                             <td class="px-4 py-3 text-xs">{{ transfer.to_snapshot.company }}<div class="mt-1 text-gray-500">{{ transfer.to_snapshot.department }} · {{ transfer.to_snapshot.location }}</div></td>
                             <td class="max-w-64 px-4 py-3"><p class="line-clamp-2 text-xs">{{ transfer.reason }}</p></td>

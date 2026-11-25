@@ -2,17 +2,20 @@
 
 namespace App\Services\AssetManagement;
 
+use App\Enums\NumberingModuleCode;
 use App\Models\Transaction\AssetManagement\Asset;
 use App\Models\Transaction\AssetManagement\AssetDisposal;
 use App\Models\Transaction\AssetManagement\AssetIncident;
 use App\Models\Transaction\AssetManagement\AssetMaintenanceRecord;
 use App\Models\User;
+use App\Services\NumberingService;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 class AssetDisposalService
 {
+    public function __construct(private readonly NumberingService $numberingService) {}
+
     /**
      * @param  array{asset_id: string, disposal_type: string, disposal_date: string, amount?: string|float|int|null, reason: string}  $data
      */
@@ -60,6 +63,9 @@ class AssetDisposalService
                 'department:id,code,name',
                 'branch:id,code,name',
                 'location:id,code,name',
+                'type:id,code',
+                'category:id,code',
+                'product:id,code',
                 'custodian:id,name,email',
             ]);
 
@@ -81,7 +87,20 @@ class AssetDisposalService
 
             $disposal = $asset->disposals()->create([
                 ...$data,
-                'number' => 'DSP-'.now()->format('Ymd').'-'.Str::upper(Str::substr((string) Str::ulid(), -8)),
+                'number' => $this->numberingService->generate(
+                    NumberingModuleCode::AssetDisposal,
+                    [
+                        'company' => $asset->company?->code,
+                        'department' => $asset->department?->code,
+                        'branch' => $asset->branch?->code,
+                        'location' => $asset->location?->code,
+                        'asset_type' => $asset->type?->code,
+                        'category' => $asset->category?->code,
+                        'product' => $asset->product?->code,
+                        'document_type' => 'ASSET_DISPOSAL',
+                        'event_type' => $data['disposal_type'],
+                    ],
+                ),
                 'status' => AssetDisposal::STATUS_PENDING_APPROVAL,
                 'asset_snapshot' => $snapshot,
                 'evidence_path' => $evidencePath,

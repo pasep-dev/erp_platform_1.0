@@ -103,11 +103,6 @@ const backupForm = useForm({});
 const moduleAvailabilityForm = useForm({
     is_active: false,
 });
-const moduleCreateForm = useForm({
-    code: "",
-    name: "",
-    category: "",
-});
 const deletingBackup = ref<string | null>(null);
 const updatingModule = ref<string | null>(null);
 const storageLocation = computed(() => {
@@ -177,15 +172,6 @@ const updateModuleAvailability = (module: NumberingModule): void => {
             },
         },
     );
-};
-
-const createNumberingModule = (): void => {
-    moduleCreateForm.post(route("settings.modules.store"), {
-        preserveScroll: true,
-        onSuccess: () => {
-            moduleCreateForm.reset();
-        },
-    });
 };
 
 const createBackup = (): void => {
@@ -940,85 +926,8 @@ const formatBackupDate = (date: string): string =>
                 </div>
 
                 <div class="space-y-4 p-6">
-                    <form
-                        class="space-y-5 rounded-xl border border-gray-200 bg-gray-50/70 p-5 dark:border-gray-800 dark:bg-gray-950/50"
-                        @submit.prevent="createNumberingModule"
-                    >
-                        <div>
-                            <h3 class="font-semibold text-gray-900 dark:text-white">
-                                Tambah Modul
-                            </h3>
-                            <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                                Daftarkan modul sistem agar dapat dipilih pada pengaturan Document Numbering.
-                            </p>
-                        </div>
-
-                        <div class="grid gap-4 md:grid-cols-3">
-                            <div>
-                                <label for="module-code" class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                                    Kode Modul
-                                </label>
-                                <input
-                                    id="module-code"
-                                    v-model="moduleCreateForm.code"
-                                    type="text"
-                                    maxlength="50"
-                                    autocomplete="off"
-                                    placeholder="contoh: SALES_ORDER"
-                                    class="h-10 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm uppercase text-gray-900 outline-none focus:border-blue-500 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
-                                    @input="moduleCreateForm.code = moduleCreateForm.code.toUpperCase()"
-                                />
-                                <p v-if="moduleCreateForm.errors.code" class="mt-1 text-sm text-red-600 dark:text-red-400">
-                                    {{ moduleCreateForm.errors.code }}
-                                </p>
-                            </div>
-                            <div>
-                                <label for="module-name" class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                                    Nama Modul
-                                </label>
-                                <input
-                                    id="module-name"
-                                    v-model="moduleCreateForm.name"
-                                    type="text"
-                                    maxlength="150"
-                                    class="h-10 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-900 outline-none focus:border-blue-500 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
-                                />
-                                <p v-if="moduleCreateForm.errors.name" class="mt-1 text-sm text-red-600 dark:text-red-400">
-                                    {{ moduleCreateForm.errors.name }}
-                                </p>
-                            </div>
-                            <div>
-                                <label for="module-category" class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                                    Kategori
-                                </label>
-                                <input
-                                    id="module-category"
-                                    v-model="moduleCreateForm.category"
-                                    type="text"
-                                    maxlength="100"
-                                    placeholder="contoh: Procurement"
-                                    class="h-10 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-900 outline-none focus:border-blue-500 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
-                                />
-                                <p v-if="moduleCreateForm.errors.category" class="mt-1 text-sm text-red-600 dark:text-red-400">
-                                    {{ moduleCreateForm.errors.category }}
-                                </p>
-                            </div>
-                        </div>
-
-                        <div class="flex justify-end border-t border-gray-200 pt-4 dark:border-gray-800">
-                            <button
-                                type="submit"
-                                :disabled="moduleCreateForm.processing"
-                                class="inline-flex h-10 items-center gap-2 rounded-lg bg-gray-900 px-4 text-sm font-medium text-white transition hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-white dark:text-gray-900 dark:hover:bg-gray-200"
-                            >
-                                <LoaderCircle v-if="moduleCreateForm.processing" class="h-4 w-4 animate-spin" />
-                                <span>{{ moduleCreateForm.processing ? "Menyimpan..." : "Tambah Modul" }}</span>
-                            </button>
-                        </div>
-                    </form>
-
                     <div class="rounded-xl border border-blue-100 bg-blue-50/70 p-4 text-sm text-blue-900 dark:border-blue-900/60 dark:bg-blue-950/30 dark:text-blue-200">
-                        Pengaturan pola, sequence, dan reset nomor tetap dilakukan di menu Document Numbering. Hanya modul aktif dari daftar ini yang dapat dipilih saat membuat aturan penomoran.
+                        Daftar ini ditetapkan oleh aplikasi. Administrator dapat mengaktifkan atau menonaktifkan modul; format dan sequence diatur melalui menu Document Numbering.
                     </div>
 
                     <div

@@ -3,8 +3,8 @@
 namespace App\Http\Requests\Master\Product;
 
 use App\Http\Requests\Master\AuthorizesMasterData;
+use App\Models\Master\Product\Category;
 use App\Models\Master\Product\Product;
-use App\Services\BranchAccessService;
 use App\Services\DepartmentAccessService;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -15,6 +15,8 @@ class ProductRequest extends FormRequest
 
     protected function prepareForValidation(): void
     {
+        $this->normalizeMasterDataCode();
+
         $this->merge([
             'inventory_tracking_mode' => $this->input('group') === 'CONSUMABLE'
                 ? $this->input('inventory_tracking_mode', 'QUANTITY')
@@ -29,6 +31,10 @@ class ProductRequest extends FormRequest
         $productId = $product instanceof Product
             ? $product->id
             : $product;
+        $categoryId = $this->input('category_id');
+        $rootCategoryId = Category::query()
+            ->whereKey($categoryId)
+            ->value('parent_id') ?: $categoryId;
 
         return [
             'department_ids' => ['required', 'array', 'min:1'],
@@ -40,17 +46,11 @@ class ProductRequest extends FormRequest
                 Rule::exists('mst_org_departments', 'id')->where('is_active', true)->whereNull('deleted_at'),
                 Rule::in(app(DepartmentAccessService::class)->departmentIds($this->user())),
             ],
-            'branch_ids' => ['required', 'array', 'min:1'],
-            'branch_ids.*' => [
-                'required', 'string', 'size:26', 'distinct',
-                Rule::exists('mst_org_branches', 'id')->where('is_active', true)->whereNull('deleted_at'),
-                Rule::in(app(BranchAccessService::class)->branchIds($this->user())),
-            ],
             'category_id' => [
                 'required',
                 'string',
                 'size:26',
-                Rule::exists('mst_asset_categories', 'id')
+                Rule::exists('mst_product_categories', 'id')
                     ->whereNull('deleted_at')
                     ->where('is_active', true),
             ],
@@ -59,7 +59,7 @@ class ProductRequest extends FormRequest
                 'required',
                 'string',
                 'size:26',
-                Rule::exists('mst_asset_types', 'id')
+                Rule::exists('mst_product_types', 'id')
                     ->whereNull('deleted_at')
                     ->where('is_active', true)
                     ->where('category_id', $this->input('category_id')),
@@ -69,18 +69,18 @@ class ProductRequest extends FormRequest
                 'required',
                 'string',
                 'size:26',
-                Rule::exists('mst_asset_brands', 'id')
+                Rule::exists('mst_product_brands', 'id')
                     ->whereNull('deleted_at')
                     ->where('is_active', true),
-                Rule::exists('mst_asset_brand_categories', 'brand_id')
-                    ->where('category_id', $this->input('category_id')),
+                Rule::exists('mst_product_brand_categories', 'brand_id')
+                    ->whereIn('category_id', array_filter([$rootCategoryId, $categoryId])),
             ],
 
             'model_id' => [
                 'nullable',
                 'string',
                 'size:26',
-                Rule::exists('mst_asset_models', 'id')
+                Rule::exists('mst_product_models', 'id')
                     ->whereNull('deleted_at')
                     ->where('is_active', true)
                     ->where('brand_id', $this->input('brand_id'))
@@ -106,18 +106,20 @@ class ProductRequest extends FormRequest
                 'nullable',
                 'string',
                 'size:26',
-                Rule::exists('mst_units_of_measure', 'id')->where('is_active', true)->whereNull('deleted_at'),
+                Rule::exists('mst_prc_uom', 'id')->where('is_active', true)->whereNull('deleted_at'),
             ],
 
-            'code' => [
-                $this->isMethod('POST') ? 'nullable' : 'required',
-                'string',
-                'max:50',
-                'alpha_dash',
-                Rule::unique('mst_products', 'code')
-                    ->ignore($productId)
-                    ->whereNull('deleted_at'),
-            ],
+            'code' => $this->isMethod('POST')
+                ? ['prohibited']
+                : [
+                    'required',
+                    'string',
+                    'max:50',
+                    'alpha_dash',
+                    Rule::unique('mst_products', 'code')
+                        ->ignore($productId)
+                        ->whereNull('deleted_at'),
+                ],
 
             'name' => [
                 'required',
@@ -129,6 +131,13 @@ class ProductRequest extends FormRequest
                 'nullable',
                 'string',
                 'max:1000',
+            ],
+
+            'image' => [
+                'nullable',
+                'image',
+                'mimes:jpg,jpeg,png,webp',
+                'max:5120',
             ],
 
             'is_active' => [
@@ -150,6 +159,7 @@ class ProductRequest extends FormRequest
             'code' => 'product code',
             'name' => 'product name',
             'description' => 'description',
+            'image' => 'product image',
             'is_active' => 'active status',
         ];
     }
