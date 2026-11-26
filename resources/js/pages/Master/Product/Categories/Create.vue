@@ -10,19 +10,18 @@ defineOptions({
     layout: AppLayout,
 });
 
-interface CategoryOption {
+interface DepartmentOption {
     id: string;
     code: string;
     name: string;
-    parent_id: string | null;
 }
 
 const props = defineProps<{
-    categories: CategoryOption[];
+    departments: DepartmentOption[];
 }>();
 
 const form = useForm({
-    parent_id: null as string | null,
+    department_id: "",
     code: "",
     name: "",
     description: "",
@@ -51,37 +50,39 @@ const cancel = () => {
         <div class="grid grid-cols-1 gap-5 md:grid-cols-2">
             <div>
                 <label
-                    for="parent_id"
+                    for="department_id"
                     class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300"
                 >
-                    Parent Category
+                    Department
+                    <span class="text-red-500">*</span>
                 </label>
 
                 <select
-                    id="parent_id"
-                    v-model="form.parent_id"
+                    id="department_id"
+                    v-model="form.department_id"
+                    required
                     class="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 text-sm text-gray-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
                 >
-                    <option value="">Root</option>
+                    <option value="">Select department</option>
 
                     <option
-                        v-for="category in props.categories"
-                        :key="category.id"
-                        :value="category.id"
+                        v-for="department in props.departments"
+                        :key="department.id"
+                        :value="department.id"
                     >
-                        {{ category.name }} ({{ category.code }})
+                        {{ department.name }} ({{ department.code }})
                     </option>
                 </select>
 
                 <p
-                    v-if="form.errors.parent_id"
+                    v-if="form.errors.department_id"
                     class="mt-1.5 text-sm text-red-600 dark:text-red-400"
                 >
-                    {{ form.errors.parent_id }}
+                    {{ form.errors.department_id }}
                 </p>
 
                 <p class="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
-                    Kosongkan jika category merupakan root category.
+                    Category akan dikelompokkan di bawah department yang dipilih.
                 </p>
             </div>
 

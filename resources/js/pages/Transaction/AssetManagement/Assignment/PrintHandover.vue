@@ -4,6 +4,8 @@ import Button from 'primevue/button'
 import PrintDocumentHeader from '@/components/print/PrintDocumentHeader.vue'
 
 interface Snapshot {
+    assignment_type?: 'USER' | 'LOCATION' | null
+    assignment_target?: string | null
     custodian_name?: string | null
     custodian_email?: string | null
     company?: string | null
@@ -46,7 +48,13 @@ const eventTitle = props.history.event_type === 'RETURNED'
     ? 'BUKTI PENGEMBALIAN ASET'
     : props.history.event_type === 'TRANSFERRED'
         ? 'BUKTI TRANSFER ASET'
+        : props.history.event_type === 'PLACED' || props.history.event_type === 'LOCATION_TRANSFERRED'
+            ? 'BUKTI PENEMPATAN ASET'
         : 'BUKTI SERAH TERIMA ASET'
+
+function assignmentTarget(snapshot: Snapshot | null): string {
+    return snapshot?.assignment_target ?? snapshot?.custodian_name ?? 'Penempatan lokasi'
+}
 
 function date(value: string): string {
     return new Intl.DateTimeFormat('id-ID', { dateStyle: 'long' }).format(new Date(`${value}T00:00:00`))
@@ -102,16 +110,16 @@ onMounted(() => {
             <section class="movement-section">
                 <h2>Detail Serah Terima</h2>
                 <table>
-                    <thead><tr><th>Proses</th><th>Penanggung Jawab</th><th>Kondisi Aset</th></tr></thead>
+                    <thead><tr><th>Proses</th><th>Target Penempatan</th><th>Kondisi Aset</th></tr></thead>
                     <tbody>
                         <tr>
                             <td>Sebelum</td>
-                            <td>{{ history.from_snapshot?.custodian_name || 'Asset Management / Available' }}</td>
+                            <td>{{ assignmentTarget(history.from_snapshot) }}</td>
                             <td>{{ condition(history.from_condition) }}</td>
                         </tr>
                         <tr>
                             <td>Sesudah</td>
-                            <td>{{ history.to_snapshot?.custodian_name || 'Asset Management / Available' }}</td>
+                            <td>{{ assignmentTarget(history.to_snapshot) }}</td>
                             <td>{{ condition(history.to_condition) }}</td>
                         </tr>
                     </tbody>
@@ -132,8 +140,8 @@ onMounted(() => {
             <p class="declaration">Dokumen ini menjadi bukti pencatatan serah terima atau pengembalian aset pada sistem Asset Management.</p>
 
             <section class="signatures">
-                <div><p>{{ history.event_type === 'RETURNED' ? 'Dikembalikan oleh' : 'Diserahkan oleh' }}</p><strong>{{ history.from_snapshot?.custodian_name || 'Asset Management' }}</strong><span>Nama dan tanda tangan</span></div>
-                <div><p>{{ history.event_type === 'RETURNED' ? 'Diterima oleh' : 'Diterima oleh' }}</p><strong>{{ history.to_snapshot?.custodian_name || 'Asset Management' }}</strong><span>Nama dan tanda tangan</span></div>
+                <div><p>{{ history.event_type === 'RETURNED' ? 'Dikembalikan oleh' : 'Dicatat dari' }}</p><strong>{{ assignmentTarget(history.from_snapshot) }}</strong><span>Nama dan tanda tangan</span></div>
+                <div><p>Target penempatan</p><strong>{{ assignmentTarget(history.to_snapshot) }}</strong><span>Nama dan tanda tangan</span></div>
             </section>
 
             <footer>Dicatat oleh {{ history.performed_by?.name || '-' }} · Referensi {{ history.id }}</footer>

@@ -63,7 +63,16 @@ class LocationRequest extends FormRequest
                         $query->where(
                             'company_id',
                             $this->input('company_id')
-                        );
+                        )->where(function ($branchQuery) {
+                            $branchId = $this->input('branch_id');
+
+                            if ($branchId) {
+                                $branchQuery->whereNull('branch_id')
+                                    ->orWhere('branch_id', $branchId);
+                            } else {
+                                $branchQuery->whereNull('branch_id');
+                            }
+                        });
                     })
                     ->whereNull('deleted_at')
                     ->where(function ($query) use ($locationId) {
@@ -75,8 +84,7 @@ class LocationRequest extends FormRequest
 
             'location_type' => [
                 'nullable',
-                'string',
-                'max:50',
+                Rule::in(array_keys(Location::TYPE_OPTIONS)),
             ],
 
             'is_active' => [

@@ -2,6 +2,7 @@
 
 namespace App\Models\Master\Product;
 
+use App\Models\Master\Organization\Department;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -17,7 +18,7 @@ class Category extends Model
     protected $table = 'mst_product_categories';
 
     protected $fillable = [
-        'parent_id',
+        'department_id',
         'code',
         'name',
         'description',
@@ -31,14 +32,9 @@ class Category extends Model
         ];
     }
 
-    public function parent(): BelongsTo
+    public function department(): BelongsTo
     {
-        return $this->belongsTo(self::class, 'parent_id');
-    }
-
-    public function children(): HasMany
-    {
-        return $this->hasMany(self::class, 'parent_id');
+        return $this->belongsTo(Department::class);
     }
 
     public function types(): HasMany

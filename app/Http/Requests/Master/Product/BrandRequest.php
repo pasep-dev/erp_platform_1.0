@@ -4,6 +4,7 @@ namespace App\Http\Requests\Master\Product;
 
 use App\Http\Requests\Master\AuthorizesMasterData;
 use App\Models\Master\Product\Brand;
+use App\Services\DepartmentAccessService;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -51,8 +52,8 @@ class BrandRequest extends FormRequest
                 'distinct',
                 Rule::exists('mst_product_categories', 'id')
                     ->whereNull('deleted_at')
-                    ->whereNull('parent_id')
-                    ->where('is_active', true),
+                    ->where('is_active', true)
+                    ->whereIn('department_id', app(DepartmentAccessService::class)->departmentIds($this->user())),
             ],
 
             'description' => [

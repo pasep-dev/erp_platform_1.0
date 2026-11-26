@@ -10,6 +10,7 @@ import PrintDocumentHeader from '@/components/print/PrintDocumentHeader.vue'
 import AssetQrCode from '@/components/asset/AssetQrCode.vue'
 import AssetBarcode from '@/components/asset/AssetBarcode.vue'
 import Button from 'primevue/button'
+import Dialog from 'primevue/dialog'
 import Tag from 'primevue/tag'
 import Select from 'primevue/select'
 
@@ -20,6 +21,7 @@ interface Asset {
     number: string
     registration_method: string
     status: string
+    assignment_type: 'USER' | 'LOCATION'
     serial_number: string | null
     specifications: Record<string, string> | null
     warranty_start_date: string | null
@@ -31,7 +33,7 @@ interface Asset {
     product: { code: string; name: string; category?: { name: string } | null; type?: { name: string } | null; brand?: { name: string } | null; model?: { name: string } | null }
     company: { code: string; name: string }
     department: { code: string; name: string }
-    location: { code: string; name: string }
+    location: { code: string; name: string; location_type?: string | null }
     branch?: { code: string; name: string } | null
     custodian?: { name: string; email: string } | null
     registered_by?: { name: string } | null
@@ -53,11 +55,11 @@ interface ReminderAsset {
 
 const props = defineProps<{
     assets: { data: Asset[]; total: number; per_page: number; links: { url: string | null; label: string; active: boolean }[] }
-    filters: { search: string; company_id: string | null; department_id: string | null; location_id: string | null; status: string; sort_field: string; sort_direction: string; per_page: number }
+    filters: { search: string; company_id: string | null; department_id: string | null; branch_id: string | null; status: string; sort_field: string; sort_direction: string; per_page: number }
     counts: { total: number; active: number; assigned: number; disposed: number }
     companies: OrganizationOption[]
     departments: OrganizationOption[]
-    locations: OrganizationOption[]
+    branches: OrganizationOption[]
     can_create_maintenance: boolean
     can_dispose: boolean
     reminders: { service_due: ReminderAsset[] }
@@ -67,7 +69,7 @@ const search = ref(props.filters.search)
 const allOrganizationValue = 'ALL'
 const companyId = ref(props.filters.company_id || allOrganizationValue)
 const departmentId = ref(props.filters.department_id || allOrganizationValue)
-const locationId = ref(props.filters.location_id || allOrganizationValue)
+const branchId = ref(props.filters.branch_id || allOrganizationValue)
 const status = ref(props.filters.status || 'ALL')
 const perPage = ref(props.assets.per_page)
 const selectedIds = ref<string[]>([])
@@ -87,7 +89,10 @@ const printCompanyName = computed(() => {
     return companyNames.length === 1 ? companyNames[0] : companyNames.length > 1 ? 'Multi-company' : null
 })
 const departmentOptions = computed(() => [{ id: allOrganizationValue, code: '', name: 'Semua departemen' }, ...props.departments])
-const locationOptions = computed(() => [{ id: allOrganizationValue, code: '', name: 'Semua lokasi' }, ...props.locations])
+const branchOptions = computed(() => [
+    { id: allOrganizationValue, code: '', name: 'Semua cabang' },
+    ...props.branches.map((branch) => ({ ...branch, name: `${branch.code} · ${branch.name}` })),
+])
 
 watch(() => props.assets.data, (assets) => {
     const visibleIds = new Set(assets.map((asset) => asset.id))
@@ -103,7 +108,7 @@ function filterParams(): Record<string, string | number | undefined> {
         search: search.value.trim() || undefined,
         company_id: companyId.value !== allOrganizationValue ? companyId.value || undefined : undefined,
         department_id: departmentId.value !== allOrganizationValue ? departmentId.value || undefined : undefined,
-        location_id: locationId.value !== allOrganizationValue ? locationId.value || undefined : undefined,
+        branch_id: branchId.value !== allOrganizationValue ? branchId.value || undefined : undefined,
         status: status.value !== 'ALL' ? status.value : undefined,
         sort_field: sortField.value,
         sort_direction: sortDirection.value,
@@ -115,7 +120,7 @@ function clearFilters(): void {
     search.value = ''
     companyId.value = allOrganizationValue
     departmentId.value = allOrganizationValue
-    locationId.value = allOrganizationValue
+    branchId.value = allOrganizationValue
     status.value = 'ALL'
     sortField.value = 'asset'
     sortDirection.value = 'asc'
@@ -256,11 +261,14 @@ function assignmentLabel(asset: Asset): string {
     if (asset.status === 'DISPOSED') return 'Disposed'
     if (asset.status === 'DISPOSAL_PENDING') return 'Menunggu Pelepasan'
     if (asset.status === 'MISSING') return 'Tidak Ditemukan'
-    return asset.custodian ? 'Assigned' : 'Available'
+    if (asset.assignment_type === 'USER') return 'Ditugaskan ke user'
+    return asset.location.location_type?.toUpperCase() === 'WAREHOUSE' ? 'Tersedia' : 'Penempatan lokasi'
 }
 
-function assignmentSeverity(status: string): 'success' | 'info' | 'danger' | 'warn' {
-    return ({ ACTIVE: 'success', MISSING: 'danger', DISPOSAL_PENDING: 'warn', DISPOSED: 'warn' } as Record<string, 'success' | 'info' | 'danger' | 'warn'>)[status] ?? 'info'
+function assignmentSeverity(asset: Asset): 'success' | 'info' | 'danger' | 'warn' {
+    if (asset.status === 'MISSING') return 'danger'
+    if (asset.status === 'DISPOSAL_PENDING' || asset.status === 'DISPOSED') return 'warn'
+    return asset.assignment_type === 'USER' ? 'info' : 'success'
 }
 </script>
 
@@ -308,7 +316,7 @@ function assignmentSeverity(status: string): 'success' | 'info' | 'danger' | 'wa
             <DataTableToolbar v-model="search" :total="assets.total" total-label="Aset" placeholder="Cari kode aset, SN, produk, atau pengguna..." @search="applyFilters">
                 <Select v-model="companyId" :options="companyOptions" option-label="name" option-value="id" filter class="w-full sm:w-44" aria-label="Filter perusahaan" @change="applyFilters" />
                 <Select v-model="departmentId" :options="departmentOptions" option-label="name" option-value="id" filter class="w-full sm:w-44" aria-label="Filter departemen" @change="applyFilters" />
-                <Select v-model="locationId" :options="locationOptions" option-label="name" option-value="id" filter class="w-full sm:w-40" aria-label="Filter lokasi" @change="applyFilters" />
+                <Select v-model="branchId" :options="branchOptions" option-label="name" option-value="id" filter class="w-full sm:w-44" aria-label="Filter cabang" @change="applyFilters" />
                 <Select v-model="status" :options="[{ label: 'Semua Status', value: 'ALL' }, { label: 'Tidak Ditemukan', value: 'MISSING' }, { label: 'Menunggu Pelepasan', value: 'DISPOSAL_PENDING' }, { label: 'Disposed', value: 'DISPOSED' }]" option-label="label" option-value="value" class="w-full sm:w-44" aria-label="Filter status aset" @change="applyFilters" />
                 <Button type="button" label="Reset" severity="secondary" outlined @click="clearFilters" />
             </DataTableToolbar>
@@ -322,7 +330,7 @@ function assignmentSeverity(status: string): 'success' | 'info' | 'danger' | 'wa
                             <td class="px-4 py-3"><div class="font-semibold text-gray-900 dark:text-white">{{ asset.number }}</div><div class="text-xs text-gray-500">{{ asset.product.code }} · {{ asset.product.name }}</div><div v-if="asset.serial_number" class="text-xs text-gray-500">SN {{ asset.serial_number }}</div></td>
                             <td class="px-4 py-3">{{ asset.company.code }} · {{ asset.company.name }}<div class="text-xs text-gray-500">{{ asset.department.code }} · {{ asset.department.name }}</div></td>
                             <td class="px-4 py-3">{{ asset.branch?.code ?? '-' }}<div class="text-xs text-gray-500">{{ asset.location.code }} · {{ asset.location.name }}</div></td>
-                            <td class="px-4 py-3"><Tag :value="assignmentLabel(asset)" :severity="assignmentSeverity(asset.status)" /><div v-if="asset.custodian" class="mt-1 text-xs text-gray-500">{{ asset.custodian.name }}</div></td>
+                            <td class="px-4 py-3"><Tag :value="assignmentLabel(asset)" :severity="assignmentSeverity(asset)" /><div v-if="asset.assignment_type === 'USER' && asset.custodian" class="mt-1 text-xs text-gray-500">{{ asset.custodian.name }}</div><div v-else class="mt-1 text-xs text-gray-500">{{ asset.location.name }}</div></td>
                             <td class="px-4 py-3"><Tag :value="assetStatusLabel(asset.status)" :severity="assetStatusSeverity(asset.status)" /></td>
                             <td class="px-4 py-3">{{ date(asset.warranty_end_date) }}</td>
                             <td class="px-4 py-3 text-right print:hidden"><Link :href="route('transaction.asset-management.directory.show', asset.id)" class="inline-flex" aria-label="Lihat detail aset"><Button icon="pi pi-eye" severity="secondary" text rounded v-tooltip.top="'Lihat detail dan riwayat aset'" /></Link></td>

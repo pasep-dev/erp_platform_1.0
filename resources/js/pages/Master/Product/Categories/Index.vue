@@ -16,7 +16,7 @@ defineOptions({
     layout: AppLayout,
 });
 
-interface ParentCategory {
+interface Department {
     id: string;
     code: string;
     name: string;
@@ -24,13 +24,13 @@ interface ParentCategory {
 
 interface Category {
     id: string;
-    parent_id: string | null;
+    department_id: string | null;
     code: string;
     name: string;
     description: string | null;
     is_active: boolean;
     created_at: string;
-    parent?: ParentCategory | null;
+    department?: Department | null;
 }
 
 interface PaginationLink {
@@ -72,8 +72,8 @@ const columns = [
         label: "Name",
     },
     {
-        key: "parent",
-        label: "Parent Category",
+        key: "department",
+        label: "Department",
     },
     {
         key: "description",
@@ -173,16 +173,16 @@ function confirmDelete(): void {
                         : 'Belum ada data asset category.'
                 "
             >
-                <template #cell-parent="{ row }">
+                <template #cell-department="{ row }">
                     <span
-                        v-if="row.parent"
+                        v-if="row.department"
                         class="text-gray-700 dark:text-gray-300"
                     >
-                        {{ row.parent.name }}
+                        {{ row.department.name }}
                     </span>
 
                     <span v-else class="text-gray-400 dark:text-gray-500">
-                        Root
+                        —
                     </span>
                 </template>
 

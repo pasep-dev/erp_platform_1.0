@@ -11,7 +11,9 @@ use App\Models\Master\Product\Category;
 use App\Models\Master\Product\Model as AssetModel;
 use App\Models\Master\Product\Product;
 use App\Models\Master\Product\Type;
+use App\Models\NumberingDocument;
 use App\Models\Transaction\AssetManagement\Asset;
+use App\Models\Transaction\AssetManagement\AssetAssignmentHistory;
 use App\Models\Transaction\AssetManagement\AssetTransferHistory;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -104,6 +106,46 @@ class AssetTransferWorkflowTest extends TestCase
         $this->assertSame(0, AssetTransferHistory::query()->count());
         $this->assertSame($asset->company_id, $asset->fresh()->company_id);
         $this->assertSame($custodian->id, $asset->fresh()->custodian_id);
+    }
+
+    public function test_assignment_can_place_an_asset_in_a_room_without_a_user_custodian(): void
+    {
+        [$actor, $asset] = $this->createTransferSetup('room');
+        $room = Location::query()->create([
+            'company_id' => $asset->company_id,
+            'branch_id' => $asset->branch_id,
+            'code' => 'ROOM-ROOM',
+            'name' => 'Meeting Room',
+            'location_type' => 'Room',
+            'is_active' => true,
+        ]);
+        NumberingDocument::query()->create([
+            'code' => 'ASSET_ASSIGNMENT',
+            'name' => 'Asset Assignment',
+            'pattern' => 'ASG-{SEQ}',
+            'sequence_length' => 6,
+            'reset_period' => 'never',
+            'is_active' => true,
+        ]);
+        $this->grantAssetPermissions($actor, 'asset.transfer');
+
+        $this->actingAs($actor)
+            ->post(route('transaction.asset-management.assignments.assign', $asset), [
+                'assignment_target' => Asset::ASSIGNMENT_LOCATION,
+                'location_id' => $room->id,
+                'condition' => 'GOOD',
+                'effective_at' => now()->toDateString(),
+            ])
+            ->assertSessionHasNoErrors();
+
+        $asset->refresh();
+        $history = AssetAssignmentHistory::query()->where('asset_id', $asset->id)->firstOrFail();
+
+        $this->assertSame(Asset::ASSIGNMENT_LOCATION, $asset->assignment_type);
+        $this->assertNull($asset->custodian_id);
+        $this->assertSame($room->id, $asset->location_id);
+        $this->assertSame('PLACED', $history->event_type);
+        $this->assertSame('ROOM-ROOM · Meeting Room', $history->to_snapshot['assignment_target']);
     }
 
     public function test_transfer_pages_require_asset_permissions(): void

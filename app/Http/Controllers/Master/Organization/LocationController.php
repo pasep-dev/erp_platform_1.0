@@ -55,6 +55,7 @@ class LocationController extends Controller
             'Master/Organization/Locations/Index',
             [
                 'locations' => $locations,
+                'location_types' => Location::TYPE_OPTIONS,
                 'filters' => [
                     'search' => $search,
                 ],
@@ -74,7 +75,7 @@ class LocationController extends Controller
 
         $parents = Location::query()
             ->orderBy('name')
-            ->get(['id', 'company_id', 'code', 'name']);
+            ->get(['id', 'company_id', 'branch_id', 'code', 'name']);
 
         return Inertia::render(
             'Master/Organization/Locations/Create',
@@ -82,6 +83,7 @@ class LocationController extends Controller
                 'companies' => $companies,
                 'branches' => $branches,
                 'parents' => $parents,
+                'location_types' => Location::TYPE_OPTIONS,
             ],
         );
     }
@@ -107,7 +109,7 @@ class LocationController extends Controller
         $parents = Location::query()
             ->where('id', '!=', $location->id)
             ->orderBy('name')
-            ->get(['id', 'company_id', 'code', 'name']);
+            ->get(['id', 'company_id', 'branch_id', 'code', 'name']);
 
         return Inertia::render(
             'Master/Organization/Locations/Edit',
@@ -116,6 +118,7 @@ class LocationController extends Controller
                 'companies' => $companies,
                 'branches' => $branches,
                 'parents' => $parents,
+                'location_types' => Location::TYPE_OPTIONS,
             ],
         );
     }

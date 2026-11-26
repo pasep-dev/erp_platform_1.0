@@ -11,6 +11,8 @@ import Tag from 'primevue/tag'
 defineOptions({ layout: AppLayout })
 
 interface Snapshot {
+    assignment_type?: 'USER' | 'LOCATION' | null
+    assignment_target?: string | null
     custodian_name?: string | null
     custodian_email?: string | null
     company?: string | null
@@ -69,13 +71,14 @@ interface Asset {
     condition: string
     registration_method: string
     serial_number: string | null
+    assignment_type: 'USER' | 'LOCATION'
     specifications: Record<string, string> | null
     acquisition_date: string
     acquisition_cost: string | null
     product: { code: string; name: string; category?: { name: string } | null; type?: { name: string } | null; brand?: { name: string } | null; model?: { name: string } | null }
     company: { code: string; name: string }
     department: { code: string; name: string }
-    location: { code: string; name: string }
+    location: { code: string; name: string; location_type?: string | null }
     branch: { code: string; name: string } | null
     custodian: { id: number; name: string; email: string } | null
     assignment_histories: AssignmentHistory[]
@@ -99,14 +102,15 @@ const assignmentStatus = computed(() => {
     if (props.asset.status === 'DISPOSAL_PENDING') return 'Menunggu Pelepasan'
     if (props.asset.status === 'DISPOSED') return 'Disposed'
     if (props.asset.status === 'MISSING') return 'Tidak Ditemukan'
-    return props.asset.custodian ? 'Assigned' : 'Available'
+    if (props.asset.assignment_type === 'USER') return 'Ditugaskan ke user'
+    return props.asset.location.location_type?.toUpperCase() === 'WAREHOUSE' ? 'Tersedia' : 'Penempatan lokasi'
 })
 
 const statusSeverity = computed(() => {
     if (props.asset.status === 'MISSING') return 'danger'
     if (props.asset.status === 'DISPOSAL_PENDING') return 'warn'
     if (props.asset.status === 'DISPOSED') return 'warn'
-    return props.asset.custodian ? 'info' : 'success'
+    return props.asset.assignment_type === 'USER' ? 'info' : 'success'
 })
 
 function date(value: string | null | undefined): string {
@@ -127,6 +131,8 @@ function eventLabel(event: AssignmentHistory): string {
     if (event.event_type === 'ASSIGNED') return 'Aset ditugaskan'
     if (event.event_type === 'TRANSFERRED') return 'Penanggung jawab dipindahkan'
     if (event.event_type === 'RETURNED') return 'Aset dikembalikan'
+    if (event.event_type === 'PLACED') return 'Aset ditempatkan di ruangan'
+    if (event.event_type === 'LOCATION_TRANSFERRED') return 'Aset dipindahkan ke ruangan lain'
     return event.event_type
 }
 
@@ -176,7 +182,7 @@ function backToDirectory(): void {
             <template #actions>
                 <Button label="Kembali" severity="secondary" outlined @click="backToDirectory" />
                 <Link v-if="can_manage && asset.status === 'ACTIVE'" :href="route('transaction.asset-management.assignments.create', asset.id)">
-                    <Button :label="asset.custodian ? 'Transfer' : 'Assign Aset'" :icon="asset.custodian ? 'pi pi-sync' : 'pi pi-user-plus'" />
+                    <Button :label="asset.assignment_type === 'USER' ? 'Ubah Penempatan' : 'Tempatkan Aset'" :icon="asset.assignment_type === 'USER' ? 'pi pi-sync' : 'pi pi-map-marker'" />
                 </Link>
                 <Link v-if="can_manage && asset.status === 'ACTIVE'" :href="route('transaction.asset-management.transfers.create', asset.id)"><Button label="Pindahkan Lokasi" icon="pi pi-arrows-alt" severity="secondary" outlined /></Link>
                 <Link v-if="can_create_maintenance && asset.status === 'ACTIVE'" :href="route('transaction.asset-management.maintenance.create', asset.id)"><Button label="Request Maintenance" icon="pi pi-wrench" severity="secondary" outlined /></Link>
@@ -189,7 +195,7 @@ function backToDirectory(): void {
             <div class="rounded-xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-900">
                 <div class="flex items-center gap-3"><span class="flex h-10 w-10 items-center justify-center rounded-lg bg-purple-100 text-purple-700 dark:bg-purple-900/60 dark:text-purple-200"><i class="pi pi-box" /></span><div><h2 class="font-semibold text-gray-900 dark:text-white">Kondisi penugasan saat ini</h2><p class="text-xs text-gray-500 dark:text-gray-400">Status dan penempatan aset</p></div></div>
                 <dl class="mt-5 grid gap-4 text-sm sm:grid-cols-2">
-                    <div><dt class="text-xs text-gray-500">Penanggung jawab</dt><dd class="mt-1 font-medium">{{ asset.custodian?.name ?? 'Belum ditugaskan' }}</dd><dd v-if="asset.custodian" class="text-xs text-gray-500">{{ asset.custodian.email }}</dd></div>
+                    <div><dt class="text-xs text-gray-500">Target penempatan</dt><dd class="mt-1 font-medium">{{ asset.assignment_type === 'USER' ? asset.custodian?.name ?? 'Pengguna tidak tersedia' : asset.location.name }}</dd><dd v-if="asset.custodian" class="text-xs text-gray-500">{{ asset.custodian.email }}</dd></div>
                     <div><dt class="text-xs text-gray-500">Lokasi fisik</dt><dd class="mt-1 font-medium">{{ asset.location.name }}</dd></div>
                     <div><dt class="text-xs text-gray-500">Perusahaan</dt><dd class="mt-1 font-medium">{{ asset.company.name }}</dd></div>
                     <div><dt class="text-xs text-gray-500">Departemen</dt><dd class="mt-1 font-medium">{{ asset.department.name }}</dd></div>
@@ -197,7 +203,7 @@ function backToDirectory(): void {
                     <div><dt class="text-xs text-gray-500">Serial number</dt><dd class="mt-1 font-medium">{{ asset.serial_number || '-' }}</dd></div>
                     <div><dt class="text-xs text-gray-500">Kondisi aset</dt><dd class="mt-1 font-medium">{{ conditionLabel(asset.condition) }}</dd></div>
                 </dl>
-                <p class="mt-5 rounded-lg bg-gray-50 px-3 py-2 text-xs text-gray-600 dark:bg-gray-800 dark:text-gray-300">Assignment mengubah penanggung jawab. Informasi departemen dan lokasi fisik tetap dicatat terpisah.</p>
+                <p class="mt-5 rounded-lg bg-gray-50 px-3 py-2 text-xs text-gray-600 dark:bg-gray-800 dark:text-gray-300">Target penempatan dapat berupa pengguna atau ruangan. Jika ditempatkan ke ruangan, lokasi fisik aset ikut diperbarui.</p>
             </div>
 
             <div class="rounded-xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-900">
@@ -207,7 +213,7 @@ function backToDirectory(): void {
                         <div class="flex w-5 shrink-0 flex-col items-center"><span class="z-10 mt-1 h-3 w-3 rounded-full border-2 border-purple-600 bg-white dark:bg-gray-900" /><span v-if="index < asset.assignment_histories.length - 1" class="absolute top-4 bottom-0 w-px bg-gray-200 dark:bg-gray-700" /></div>
                         <div class="min-w-0 flex-1 rounded-lg bg-gray-50 p-3 dark:bg-gray-800/70">
                             <div class="flex flex-wrap items-start justify-between gap-2"><div><h3 class="text-sm font-semibold text-gray-900 dark:text-white">{{ eventLabel(event) }}</h3><p class="mt-1 font-mono text-xs text-purple-700 dark:text-purple-300">{{ event.number }}</p></div><div class="flex items-center gap-2"><time class="text-xs text-gray-500">{{ date(event.effective_at) }}</time><Button icon="pi pi-print" severity="secondary" text rounded aria-label="Cetak bukti serah terima" v-tooltip.top="'Cetak bukti serah terima / return'" @click="printHistory(event)" /></div></div>
-                            <p class="mt-2 text-xs leading-5 text-gray-600 dark:text-gray-300"><span class="font-medium">{{ event.from_snapshot?.custodian_name ?? 'Available' }}</span><i class="pi pi-arrow-right mx-2 text-[10px] text-gray-400" /><span class="font-medium">{{ event.to_snapshot?.custodian_name ?? 'Available' }}</span></p>
+                            <p class="mt-2 text-xs leading-5 text-gray-600 dark:text-gray-300"><span class="font-medium">{{ event.from_snapshot?.assignment_target ?? event.from_snapshot?.custodian_name ?? 'Penempatan lokasi' }}</span><i class="pi pi-arrow-right mx-2 text-[10px] text-gray-400" /><span class="font-medium">{{ event.to_snapshot?.assignment_target ?? event.to_snapshot?.custodian_name ?? 'Penempatan lokasi' }}</span></p>
                             <p class="mt-1 text-xs text-gray-600 dark:text-gray-300">Kondisi: {{ conditionLabel(event.from_condition) }} <i class="pi pi-arrow-right mx-1 text-[10px] text-gray-400" /> {{ conditionLabel(event.to_condition) }}</p>
                             <p v-if="event.remarks" class="mt-2 whitespace-pre-line text-xs text-gray-600 dark:text-gray-300">{{ event.remarks }}</p>
                             <p class="mt-2 text-[11px] text-gray-500">Dicatat oleh {{ event.performed_by?.name ?? 'Pengguna tidak tersedia' }}</p>

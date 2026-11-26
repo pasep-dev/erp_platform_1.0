@@ -121,18 +121,20 @@ class ProductController extends Controller
             [
                 'categories' => Category::query()
                     ->where('is_active', true)
+                    ->whereIn('department_id', $departmentAccess->departmentIds($request->user()))
                     ->orderBy('name')
-                    ->get(['id', 'code', 'name', 'parent_id']),
+                    ->with('department:id,code,name')
+                    ->get(['id', 'code', 'name', 'department_id']),
                 'unitsOfMeasure' => UnitOfMeasure::query()->where('is_active', true)->orderBy('name')->get(['id', 'code', 'name']),
                 'departments' => $this->accessibleDepartments($request, $departmentAccess),
                 'types' => Type::query()
-                    ->with('category:id,code,name,parent_id')
+                    ->with('category:id,code,name,department_id')
                     ->where('is_active', true)
                     ->orderBy('name')
                     ->get(['id', 'category_id', 'code', 'name']),
                 'brands' => Brand::query()
                     ->where('is_active', true)
-                    ->with('categories:id,code,name,parent_id')
+                    ->with('categories:id,code,name,department_id')
                     ->orderBy('name')
                     ->get(['id', 'code', 'name']),
                 'models' => AssetModel::query()
@@ -210,8 +212,10 @@ class ProductController extends Controller
                 'unitsOfMeasure' => UnitOfMeasure::query()->where('is_active', true)->orderBy('name')->get(['id', 'code', 'name']),
                 'categories' => Category::query()
                     ->where('is_active', true)
+                    ->whereIn('department_id', $departmentAccess->departmentIds($request->user()))
                     ->orderBy('name')
-                    ->get(['id', 'code', 'name', 'parent_id']),
+                    ->with('department:id,code,name')
+                    ->get(['id', 'code', 'name', 'department_id']),
                 'types' => Type::query()
                     ->with('category')
                     ->where('is_active', true)
@@ -219,7 +223,7 @@ class ProductController extends Controller
                     ->get(['id', 'category_id', 'code', 'name']),
                 'brands' => Brand::query()
                     ->where('is_active', true)
-                    ->with('categories:id,code,name,parent_id')
+                    ->with('categories:id,code,name,department_id')
                     ->orderBy('name')
                     ->get(['id', 'code', 'name']),
                 'models' => AssetModel::query()

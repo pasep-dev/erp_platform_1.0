@@ -16,8 +16,8 @@ interface CategoryOption {
     id: string;
     code: string;
     name: string;
-    parent_id: string | null;
-    parent: {
+    department_id: string | null;
+    department: {
         id: string;
         code: string;
         name: string;
@@ -35,11 +35,11 @@ const categoryGroups = computed(() => {
     >();
 
     for (const category of props.categories) {
-        const groupCode = category.parent?.code ?? "OTHER";
+        const groupCode = category.department?.code ?? "OTHER";
         const group = groups.get(groupCode) ?? {
             code: groupCode,
-            label: category.parent
-                ? `${category.parent.code} · ${category.parent.name}`
+            label: category.department
+                ? `${category.department.code} · ${category.department.name}`
                 : "Lainnya",
             categories: [],
         };

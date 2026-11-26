@@ -3,10 +3,9 @@
 namespace App\Http\Requests\Master\Product;
 
 use App\Http\Requests\Master\AuthorizesMasterData;
-use App\Models\Master\Product\Category;
+use App\Services\DepartmentAccessService;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
-use Illuminate\Validation\Validator;
 
 class CategoryRequest extends FormRequest
 {
@@ -15,20 +14,17 @@ class CategoryRequest extends FormRequest
     public function rules(): array
     {
         $category = $this->route('category');
-
-        $categoryId = $category instanceof Category
-            ? $category->id
-            : $category;
+        $categoryId = is_object($category) ? $category->id : $category;
 
         return [
-            'parent_id' => [
-                'nullable',
+            'department_id' => [
+                'required',
                 'string',
                 'size:26',
-                Rule::exists('mst_product_categories', 'id')
-                    ->whereNull('parent_id')
+                Rule::exists('mst_org_departments', 'id')
+                    ->where('is_active', true)
                     ->whereNull('deleted_at'),
-                Rule::notIn([$categoryId]),
+                Rule::in(app(DepartmentAccessService::class)->departmentIds($this->user())),
             ],
 
             'code' => [
@@ -63,63 +59,11 @@ class CategoryRequest extends FormRequest
     public function attributes(): array
     {
         return [
-            'parent_id' => 'parent category',
+            'department_id' => 'department',
             'code' => 'category code',
             'name' => 'category name',
             'description' => 'description',
             'is_active' => 'active status',
         ];
-    }
-
-    public function withValidator(Validator $validator): void
-    {
-        $validator->after(function (Validator $validator) {
-            $category = $this->route('category');
-
-            if (! $category instanceof Category) {
-                return;
-            }
-
-            $parentId = $this->input('parent_id');
-
-            if (! $parentId) {
-                return;
-            }
-
-            $parent = Category::query()
-                ->find($parentId);
-
-            if (! $parent) {
-                return;
-            }
-
-            $visited = [];
-
-            while ($parent) {
-                if (isset($visited[$parent->id])) {
-                    break;
-                }
-
-                $visited[$parent->id] = true;
-
-                if ($parent->id === $category->id) {
-                    $validator
-                        ->errors()
-                        ->add(
-                            'parent_id',
-                            'The selected parent category would create a circular hierarchy.'
-                        );
-
-                    break;
-                }
-
-                if (! $parent->parent_id) {
-                    break;
-                }
-
-                $parent = Category::query()
-                    ->find($parent->parent_id);
-            }
-        });
     }
 }

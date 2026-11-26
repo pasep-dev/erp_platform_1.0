@@ -3,13 +3,10 @@
 namespace App\Services\AssetManagement;
 
 use App\Enums\NumberingModuleCode;
-use App\Models\Master\Organization\Company;
-use App\Models\Master\Organization\Department;
-use App\Models\Master\Organization\Location;
+use App\Models\Master\Organization\Branch;
 use App\Models\Transaction\AssetManagement\Asset;
 use App\Models\Transaction\AssetManagement\AssetMaintenanceRecord;
 use App\Models\Transaction\AssetManagement\AssetTransferHistory;
-use App\Models\User;
 use App\Services\BranchAccessService;
 use App\Services\DepartmentAccessService;
 use App\Services\NumberingService;
@@ -21,11 +18,12 @@ class AssetTransferService
     public function __construct(
         private readonly DepartmentAccessService $departmentAccess,
         private readonly BranchAccessService $branchAccess,
+        private readonly BranchWarehouseResolver $warehouseResolver,
         private readonly NumberingService $numberingService,
     ) {}
 
     /**
-     * @param  array{company_id: string, department_id: string, location_id: string, effective_at: string, reason: string}  $data
+     * @param  array{branch_id: string, effective_at: string, reason: string}  $data
      */
     public function transfer(Asset $asset, array $data, User $actor): AssetTransferHistory
     {
@@ -50,79 +48,41 @@ class AssetTransferService
                 ]);
             }
 
-            $company = Company::query()
-                ->whereKey($data['company_id'])
-                ->where('is_active', true)
-                ->firstOrFail();
-            $department = Department::query()
-                ->whereKey($data['department_id'])
-                ->where('company_id', $company->id)
-                ->where('is_active', true)
-                ->first();
-            $location = Location::query()
-                ->whereKey($data['location_id'])
-                ->where('company_id', $company->id)
+            $branch = Branch::query()
+                ->whereKey($data['branch_id'])
+                ->where('company_id', $lockedAsset->company_id)
                 ->where('is_active', true)
                 ->first();
 
-            if ($department === null || $location === null) {
+            if ($branch === null) {
                 throw ValidationException::withMessages([
-                    'company_id' => 'Departemen dan lokasi harus aktif serta berada di perusahaan tujuan.',
+                    'branch_id' => 'Branch tujuan harus aktif dan berada di perusahaan aset.',
                 ]);
             }
 
-            $this->departmentAccess->authorize($actor, $department->id);
+            $this->departmentAccess->authorize($actor, $lockedAsset->department_id);
             $this->branchAccess->authorize($actor, $lockedAsset->branch_id);
-            $this->branchAccess->authorize($actor, $location->branch_id);
+            $this->branchAccess->authorize($actor, (string) $branch->id);
 
-            if (! $lockedAsset->product?->departments()->whereKey($department->id)->exists()) {
+            if ($lockedAsset->branch_id === $branch->id) {
                 throw ValidationException::withMessages([
-                    'department_id' => 'Produk aset belum ditautkan ke department tujuan.',
+                    'branch_id' => 'Pilih branch yang berbeda dari branch aset saat ini.',
                 ]);
             }
 
-            if ($lockedAsset->custodian_id !== null) {
-                $custodian = User::query()->whereKey($lockedAsset->custodian_id)->first();
-                if ($custodian !== null && ! $this->branchAccess->canAccess($custodian, $location->branch_id)) {
-                    throw ValidationException::withMessages([
-                        'location_id' => 'Penanggung jawab aset tidak memiliki akses ke branch tujuan.',
-                    ]);
-                }
-            }
-
-            if (
-                $lockedAsset->company_id === $company->id
-                && $lockedAsset->department_id === $department->id
-                && $lockedAsset->location_id === $location->id
-                && $lockedAsset->branch_id === $location->branch_id
-            ) {
-                throw ValidationException::withMessages([
-                    'location_id' => 'Penempatan tujuan sama dengan penempatan aset saat ini.',
-                ]);
-            }
-
-            if ($lockedAsset->company_id !== $company->id && $lockedAsset->custodian_id !== null) {
-                $custodian = User::query()->whereKey($lockedAsset->custodian_id)->first();
-
-                if ($custodian?->company_id !== null && $custodian->company_id !== $company->id) {
-                    throw ValidationException::withMessages([
-                        'asset_id' => 'Kembalikan aset dari penanggung jawab saat ini sebelum memindahkannya ke perusahaan lain.',
-                    ]);
-                }
-            }
+            $warehouse = $this->warehouseResolver->resolve($branch);
 
             $lockedAsset->load(['company:id,code,name', 'department:id,code,name', 'location:id,code,name', 'branch:id,code,name', 'type:id,code', 'category:id,code', 'product:id,code', 'custodian:id,name,email']);
-            $location->loadMissing(['company:id,code,name', 'branch:id,code,name']);
-            $department->loadMissing('company:id,code,name');
+            $warehouse->loadMissing(['company:id,code,name', 'branch:id,code,name']);
             $fromSnapshot = $this->snapshot($lockedAsset);
 
             $number = $this->numberingService->generate(
                 NumberingModuleCode::AssetTransfer,
                 [
-                    'company' => $company->code,
-                    'department' => $department->code,
-                    'branch' => $location->branch?->code,
-                    'location' => $location->code,
+                    'company' => $lockedAsset->company?->code,
+                    'department' => $lockedAsset->department?->code,
+                    'branch' => $branch->code,
+                    'location' => $warehouse->code,
                     'asset_type' => $lockedAsset->type?->code,
                     'category' => $lockedAsset->category?->code,
                     'product' => $lockedAsset->product?->code,
@@ -130,24 +90,22 @@ class AssetTransferService
                     'source_department' => $lockedAsset->department?->code,
                     'source_branch' => $lockedAsset->branch?->code,
                     'source_location' => $lockedAsset->location?->code,
-                    'target_company' => $company->code,
-                    'target_department' => $department->code,
-                    'target_branch' => $location->branch?->code,
-                    'target_location' => $location->code,
+                    'target_company' => $lockedAsset->company?->code,
+                    'target_department' => $lockedAsset->department?->code,
+                    'target_branch' => $branch->code,
+                    'target_location' => $warehouse->code,
                     'document_type' => 'ASSET_TRANSFER',
                 ],
             );
 
             $lockedAsset->fill([
-                'company_id' => $company->id,
-                'department_id' => $department->id,
-                'location_id' => $location->id,
-                'branch_id' => $location->branch_id,
+                'location_id' => $warehouse->id,
+                'branch_id' => $branch->id,
+                'custodian_id' => null,
+                'assignment_type' => Asset::ASSIGNMENT_LOCATION,
             ])->save();
-            $lockedAsset->setRelation('company', $company);
-            $lockedAsset->setRelation('department', $department);
-            $lockedAsset->setRelation('location', $location);
-            $lockedAsset->setRelation('branch', $location->branch);
+            $lockedAsset->setRelation('location', $warehouse);
+            $lockedAsset->setRelation('branch', $branch);
 
             return $lockedAsset->transferHistories()->create([
                 'number' => $number,

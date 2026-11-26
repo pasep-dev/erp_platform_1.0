@@ -3,7 +3,6 @@
 namespace App\Http\Requests\Master\Product;
 
 use App\Http\Requests\Master\AuthorizesMasterData;
-use App\Models\Master\Product\Category;
 use App\Models\Master\Product\Model as ProductModel;
 use App\Models\Master\Product\Type as ProductType;
 use Illuminate\Foundation\Http\FormRequest;
@@ -23,9 +22,6 @@ class ModelRequest extends FormRequest
         $categoryId = ProductType::query()
             ->whereKey($this->input('type_id'))
             ->value('category_id');
-        $rootCategoryId = $categoryId
-            ? (Category::query()->whereKey($categoryId)->value('parent_id') ?: $categoryId)
-            : null;
 
         return [
             'brand_id' => [
@@ -36,7 +32,7 @@ class ModelRequest extends FormRequest
                     ->whereNull('deleted_at')
                     ->where('is_active', true),
                 Rule::exists('mst_product_brand_categories', 'brand_id')
-                    ->whereIn('category_id', array_filter([$rootCategoryId, $categoryId])),
+                    ->where('category_id', $categoryId),
             ],
 
             'type_id' => [

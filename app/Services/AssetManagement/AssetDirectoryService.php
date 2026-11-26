@@ -3,9 +3,9 @@
 namespace App\Services\AssetManagement;
 
 use App\Enums\NumberingModuleCode;
+use App\Models\Master\Organization\Branch;
 use App\Models\Master\Organization\Company;
 use App\Models\Master\Organization\Department;
-use App\Models\Master\Organization\Location;
 use App\Models\Master\Product\Product;
 use App\Models\Transaction\AssetManagement\Asset;
 use App\Models\User;
@@ -25,12 +25,13 @@ class AssetDirectoryService
     public function __construct(
         private readonly DepartmentAccessService $departmentAccess,
         private readonly BranchAccessService $branchAccess,
+        private readonly BranchWarehouseResolver $warehouseResolver,
         private readonly NumberingService $numberingService,
     ) {}
 
     public const IMPORT_HEADERS = [
         'product_code', 'company_code', 'department_code',
-        'location_code', 'branch_code', 'custodian_email', 'serial_number',
+        'branch_code', 'serial_number',
         'acquisition_date', 'acquisition_cost', 'warranty_duration_months',
         'specifications', 'remarks',
     ];
@@ -46,7 +47,7 @@ class AssetDirectoryService
             'product.model:id,name',
             'company:id,code,name',
             'department:id,code,name',
-            'location:id,code,name,branch_id',
+            'location:id,code,name,branch_id,location_type',
             'branch:id,code,name',
             'custodian:id,name,email',
             'registeredBy:id,name',
@@ -80,11 +81,22 @@ class AssetDirectoryService
             $query->where('status', $status);
         }
 
-        foreach (['company_id', 'department_id', 'location_id'] as $organizationFilter) {
+        foreach (['company_id', 'department_id'] as $organizationFilter) {
             $organizationId = $request->string($organizationFilter)->toString();
             if ($organizationId !== '') {
                 $query->where($organizationFilter, $organizationId);
             }
+        }
+
+        $branchId = $request->string('branch_id')->toString();
+        if ($branchId !== '') {
+            $query->where(function (Builder $branchQuery) use ($branchId): void {
+                $branchQuery->where('trx_assets.branch_id', $branchId)
+                    ->orWhere(function (Builder $locationQuery) use ($branchId): void {
+                        $locationQuery->whereNull('trx_assets.branch_id')
+                            ->whereHas('location', fn (Builder $location) => $location->where('mst_org_locations.branch_id', $branchId));
+                    });
+            });
         }
 
         return $query;
@@ -170,9 +182,8 @@ class AssetDirectoryService
         $companies = Company::query()->whereIn('code', $codes('company_code'))->get()->keyBy('code');
         $departments = Department::query()->whereIn('code', $codes('department_code'))
             ->get()->keyBy(fn (Department $department) => $department->company_id.'|'.$department->code);
-        $locations = Location::query()->with('branch')->whereIn('code', $codes('location_code'))
-            ->get()->keyBy(fn (Location $location) => $location->company_id.'|'.$location->code);
-        $users = User::query()->whereIn('email', $codes('custodian_email'))->get()->keyBy('email');
+        $branches = Branch::query()->whereIn('code', $codes('branch_code'))
+            ->get()->keyBy(fn (Branch $branch) => $branch->company_id.'|'.$branch->code);
 
         $validatedRows = [];
         $errors = [];
@@ -191,9 +202,7 @@ class AssetDirectoryService
                 'product_code' => ['required', 'string', 'max:100'],
                 'company_code' => ['required', 'string', 'max:50'],
                 'department_code' => ['required', 'string', 'max:50'],
-                'location_code' => ['required', 'string', 'max:50'],
-                'branch_code' => ['nullable', 'string', 'max:50'],
-                'custodian_email' => ['nullable', 'email', 'max:255'],
+                'branch_code' => ['required', 'string', 'max:50'],
                 'serial_number' => ['nullable', 'string', 'max:150'],
                 'acquisition_date' => ['required', 'date_format:Y-m-d'],
                 'acquisition_cost' => ['nullable', 'numeric', 'min:0'],
@@ -222,9 +231,9 @@ class AssetDirectoryService
             }
 
             $department = $departments->get($company->id.'|'.$data['department_code']);
-            $location = $locations->get($company->id.'|'.$data['location_code']);
-            if ($department === null || $location === null) {
-                $errors[] = "Baris {$line}: Departemen atau lokasi tidak ditemukan pada perusahaan tersebut.";
+            $branch = $branches->get($company->id.'|'.$data['branch_code']);
+            if ($department === null || $branch === null || ! $branch->is_active) {
+                $errors[] = "Baris {$line}: Departemen atau branch aktif tidak ditemukan pada perusahaan tersebut.";
 
                 continue;
             }
@@ -238,32 +247,16 @@ class AssetDirectoryService
 
                 continue;
             }
-            if ($data['branch_code'] !== '' && $location->branch?->code !== $data['branch_code']) {
-                $errors[] = "Baris {$line}: Cabang tidak sesuai dengan cabang lokasi.";
+            if (! $this->branchAccess->canAccess($actor, (string) $branch->id)) {
+                $errors[] = "Baris {$line}: Anda tidak memiliki akses ke branch tersebut.";
 
                 continue;
             }
 
-            $custodian = $data['custodian_email'] !== '' ? $users->get($data['custodian_email']) : null;
-            if ($data['custodian_email'] !== '' && (
-                $custodian === null || ! $custodian->is_active || ($custodian->company_id !== null && $custodian->company_id !== $company->id)
-            )) {
-                $errors[] = "Baris {$line}: Email penanggung jawab tidak aktif atau bukan dari perusahaan aset.";
-
-                continue;
-            }
-
-            if ($custodian !== null
-                && ! $custodian->hasGlobalDepartmentAccess()
-                && $custodian->department_id !== $department->id
-                && ! $custodian->additionalDepartments()->whereKey($department->id)->exists()) {
-                $errors[] = "Baris {$line}: Penanggung jawab tidak memiliki akses ke department aset.";
-
-                continue;
-            }
-
-            if ($custodian !== null && ! $this->branchAccess->canAccess($custodian, $location->branch_id)) {
-                $errors[] = "Baris {$line}: Penanggung jawab tidak memiliki akses ke branch aset.";
+            try {
+                $warehouse = $this->warehouseResolver->resolve($branch);
+            } catch (ValidationException $exception) {
+                $errors[] = "Baris {$line}: ".collect($exception->errors())->flatten()->implode(' ');
 
                 continue;
             }
@@ -290,8 +283,8 @@ class AssetDirectoryService
                 'product' => $product,
                 'company' => $company,
                 'department' => $department,
-                'location' => $location,
-                'custodian' => $custodian,
+                'location' => $warehouse,
+                'branch' => $branch,
                 'specifications' => $specifications,
             ];
         }
@@ -324,7 +317,7 @@ class AssetDirectoryService
                             'asset_type' => $row['product']->type->code,
                             'category' => $row['product']->category->code,
                             'product' => $row['product']->code,
-                            'branch' => $row['location']->branch?->code ?? $row['location']->code,
+                            'branch' => $row['branch']->code,
                             'location' => $row['location']->code,
                             'document_type' => Asset::METHOD_EXISTING,
                         ],
@@ -340,7 +333,8 @@ class AssetDirectoryService
                     'department_id' => $row['department']->id,
                     'location_id' => $row['location']->id,
                     'branch_id' => $row['location']->branch_id,
-                    'custodian_id' => $row['custodian']?->id,
+                    'custodian_id' => null,
+                    'assignment_type' => Asset::ASSIGNMENT_LOCATION,
                     'serial_number' => $data['serial_number'] !== '' ? $data['serial_number'] : null,
                     'specifications' => $row['specifications'],
                     'warranty_duration_months' => $warrantyMonths,

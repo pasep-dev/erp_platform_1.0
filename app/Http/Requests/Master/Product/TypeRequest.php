@@ -5,6 +5,7 @@ namespace App\Http\Requests\Master\Product;
 use App\Http\Requests\Master\AuthorizesMasterData;
 use App\Models\Master\Product\Category;
 use App\Models\Master\Product\Type;
+use App\Services\DepartmentAccessService;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
@@ -27,8 +28,8 @@ class TypeRequest extends FormRequest
                 'string',
                 'size:26',
                 Rule::exists('mst_product_categories', 'id')
-                    ->whereNotNull('parent_id')
                     ->where('is_active', true)
+                    ->whereIn('department_id', app(DepartmentAccessService::class)->departmentIds($this->user()))
                     ->whereNull('deleted_at'),
             ],
 

@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Transaction\AssetManagement;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Transaction\AssetManagement\AssignAssetRequest;
 use App\Http\Requests\Transaction\AssetManagement\ReturnAssetRequest;
+use App\Models\Master\Organization\Location;
 use App\Models\Transaction\AssetManagement\Asset;
 use App\Models\Transaction\AssetManagement\AssetAssignmentHistory;
 use App\Models\User;
@@ -33,7 +34,7 @@ class AssetAssignmentController extends Controller
                 'product:id,code,name',
                 'company:id,code,name',
                 'department:id,code,name',
-                'location:id,code,name',
+                'location:id,code,name,location_type',
                 'custodian:id,name,email',
             ])
             ->when($search !== '', function (Builder $query) use ($search): void {
@@ -42,12 +43,14 @@ class AssetAssignmentController extends Controller
                         ->orWhere('serial_number', 'ilike', "%{$search}%")
                         ->orWhereHas('product', fn (Builder $product) => $product->where('name', 'ilike', "%{$search}%")
                             ->orWhere('code', 'ilike', "%{$search}%"))
+                        ->orWhereHas('location', fn (Builder $location) => $location->where('name', 'ilike', "%{$search}%")
+                            ->orWhere('code', 'ilike', "%{$search}%"))
                         ->orWhereHas('custodian', fn (Builder $custodian) => $custodian->where('name', 'ilike', "%{$search}%")
                             ->orWhere('email', 'ilike', "%{$search}%"));
                 });
             })
-            ->when($assignmentStatus === 'AVAILABLE', fn (Builder $query) => $query->whereNull('custodian_id'))
-            ->when($assignmentStatus === 'ASSIGNED', fn (Builder $query) => $query->whereNotNull('custodian_id'))
+            ->when($assignmentStatus === Asset::ASSIGNMENT_LOCATION, fn (Builder $query) => $query->where('assignment_type', Asset::ASSIGNMENT_LOCATION))
+            ->when($assignmentStatus === Asset::ASSIGNMENT_USER, fn (Builder $query) => $query->where('assignment_type', Asset::ASSIGNMENT_USER))
             ->latest('created_at')
             ->paginate($perPage)
             ->withQueryString();
@@ -56,7 +59,7 @@ class AssetAssignmentController extends Controller
             'assets' => $assets,
             'filters' => [
                 'search' => $search,
-                'assignment_status' => in_array($assignmentStatus, ['AVAILABLE', 'ASSIGNED'], true) ? $assignmentStatus : 'ALL',
+                'assignment_status' => in_array($assignmentStatus, [Asset::ASSIGNMENT_LOCATION, Asset::ASSIGNMENT_USER], true) ? $assignmentStatus : 'ALL',
             ],
             'can_manage' => $request->user()?->can('asset.transfer') === true,
         ]);
@@ -71,7 +74,7 @@ class AssetAssignmentController extends Controller
             'product:id,code,name',
             'company:id,code,name',
             'department:id,code,name',
-            'location:id,code,name',
+            'location:id,code,name,location_type',
             'custodian:id,name,email',
         ]);
 
@@ -84,21 +87,41 @@ class AssetAssignmentController extends Controller
             ->orderBy('name')
             ->get(['id', 'company_id', 'name', 'email']);
 
+        $locations = Location::query()
+            ->withoutGlobalScope('branch_access')
+            ->where('company_id', $asset->company_id)
+            ->where(function (Builder $query) use ($asset): void {
+                $query->whereNull('branch_id')
+                    ->orWhere('branch_id', $asset->branch_id);
+            })
+            ->where('is_active', true)
+            ->with('parent:id,code,name')
+            ->orderBy('name')
+            ->get(['id', 'parent_id', 'code', 'name', 'location_type']);
+
         return Inertia::render('Transaction/AssetManagement/Assignment/Create', [
             'asset' => $asset,
             'users' => $users,
-            'is_transfer' => $asset->custodian_id !== null,
+            'locations' => $locations,
+            'is_transfer' => $asset->assignment_type === Asset::ASSIGNMENT_USER,
             'condition_options' => Asset::CONDITION_OPTIONS,
         ]);
     }
 
     public function assign(AssignAssetRequest $request, Asset $asset, AssetAssignmentService $service): RedirectResponse
     {
-        $assignee = User::query()->findOrFail($request->validated('assignee_id'));
+        $assignee = $request->validated('assignee_id') !== null
+            ? User::query()->findOrFail($request->validated('assignee_id'))
+            : null;
+        $location = $request->validated('location_id') !== null
+            ? Location::query()->findOrFail($request->validated('location_id'))
+            : null;
 
         $service->assign(
             $asset,
+            $request->validated('assignment_target'),
             $assignee,
+            $location,
             $request->user(),
             $request->validated('condition'),
             $request->validated('effective_at'),
@@ -106,7 +129,7 @@ class AssetAssignmentController extends Controller
         );
 
         return to_route('transaction.asset-management.assignments.show', $asset)
-            ->with('success', 'Penugasan aset berhasil disimpan dan masuk ke riwayat.');
+            ->with('success', 'Penempatan aset berhasil disimpan dan masuk ke riwayat.');
     }
 
     public function returnAsset(ReturnAssetRequest $request, Asset $asset, AssetAssignmentService $service): RedirectResponse
@@ -120,7 +143,7 @@ class AssetAssignmentController extends Controller
         );
 
         return to_route('transaction.asset-management.assignments.show', $asset)
-            ->with('success', 'Aset berhasil dikembalikan menjadi Available.');
+            ->with('success', 'Aset berhasil dilepas dari pengguna dan kembali dalam penempatan lokasi.');
     }
 
     public function show(Request $request, Asset $asset): Response
@@ -135,7 +158,7 @@ class AssetAssignmentController extends Controller
             'product.model:id,name',
             'company:id,code,name',
             'department:id,code,name',
-            'location:id,code,name',
+            'location:id,code,name,location_type',
             'branch:id,code,name',
             'custodian:id,name,email',
             'assignmentHistories' => fn (HasMany $query): HasMany => $query

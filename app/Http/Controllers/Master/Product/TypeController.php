@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Master\Product\TypeRequest;
 use App\Models\Master\Product\Category;
 use App\Models\Master\Product\Type;
+use App\Services\DepartmentAccessService;
 use App\Services\NumberingService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -21,7 +22,7 @@ class TypeController extends Controller
         $search = $request->string('search')->trim()->toString();
 
         $types = Type::query()
-            ->with('category')
+            ->with('category.department:id,code,name')
             ->when($search !== '', function ($query) use ($search) {
                 $query->where(function ($query) use ($search) {
                     $query
@@ -50,17 +51,17 @@ class TypeController extends Controller
         );
     }
 
-    public function create(): Response
+    public function create(Request $request, DepartmentAccessService $departmentAccess): Response
     {
         $categories = Category::query()
             ->where('is_active', true)
-            ->whereNotNull('parent_id')
-            ->with('parent:id,code,name')
+            ->whereIn('department_id', $departmentAccess->departmentIds($request->user()))
+            ->with('department:id,code,name')
             ->get([
                 'id',
                 'code',
                 'name',
-                'parent_id',
+                'department_id',
             ]);
 
         return Inertia::render(
@@ -98,24 +99,21 @@ class TypeController extends Controller
             ->with('success', 'Asset Type was created successfully.');
     }
 
-    public function edit(Type $type): Response
+    public function edit(Request $request, Type $type, DepartmentAccessService $departmentAccess): Response
     {
         $categories = Category::query()
+            ->with('department:id,code,name')
             ->where(function ($query) use ($type) {
-                $query
-                    ->where(function ($query) {
-                        $query
-                            ->where('is_active', true)
-                            ->whereNotNull('parent_id');
-                    })
+                $query->where('is_active', true)
                     ->orWhere('id', $type->category_id);
             })
+            ->whereIn('department_id', $departmentAccess->departmentIds($request->user()))
             ->orderBy('name')
             ->get([
                 'id',
                 'code',
                 'name',
-                'parent_id',
+                'department_id',
             ]);
 
         return Inertia::render(

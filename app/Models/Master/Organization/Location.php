@@ -16,6 +16,16 @@ class Location extends Model
 
     protected $table = 'mst_org_locations';
 
+    public const TYPE_OPTIONS = [
+        'BUILDING' => 'Building',
+        'FLOOR' => 'Floor',
+        'ROOM' => 'Room',
+        'WAREHOUSE' => 'Warehouse',
+        'STORAGE' => 'Storage Area',
+        'PARKING' => 'Parking Area',
+        'OTHER' => 'Other',
+    ];
+
     protected $fillable = [
         'company_id',
         'branch_id',

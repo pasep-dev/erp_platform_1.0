@@ -2,8 +2,9 @@
 
 namespace App\Http\Requests\Transaction\AssetManagement;
 
-use App\Models\Master\Organization\Location;
-use App\Models\User;
+use App\Models\Master\Organization\Branch;
+use App\Models\Transaction\Procurement\GoodsReceiptItem;
+use App\Services\BranchAccessService;
 use App\Services\DepartmentAccessService;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -25,8 +26,9 @@ class StoreAssetRegistrationRequest extends FormRequest
             'product_id' => [$isProcurementRegistration ? 'prohibited' : 'required', 'string', Rule::exists('mst_products', 'id')->where('group', 'ASSET')->where('is_active', true)->whereNull('deleted_at'), Rule::exists('mst_product_departments', 'product_id')->where('department_id', $this->input('department_id'))],
             'company_id' => [$isProcurementRegistration ? 'prohibited' : 'required', 'string', Rule::exists('mst_org_companies', 'id')->where('is_active', true)->whereNull('deleted_at')],
             'department_id' => [$isProcurementRegistration ? 'prohibited' : 'required', 'string', Rule::exists('mst_org_departments', 'id')->where('company_id', $this->input('company_id'))->where('is_active', true)->whereNull('deleted_at'), Rule::in(app(DepartmentAccessService::class)->departmentIds($this->user()))],
-            'location_id' => ['required', 'string', 'exists:mst_org_locations,id'],
-            'custodian_id' => ['nullable', 'integer', Rule::exists('users', 'id')->where('is_active', true)],
+            'branch_id' => ['required', 'string', 'size:26', Rule::exists('mst_org_branches', 'id')->where('is_active', true)->whereNull('deleted_at'), Rule::in(app(BranchAccessService::class)->branchIds($this->user()))],
+            'location_id' => ['prohibited'],
+            'custodian_id' => ['prohibited'],
             'units' => ['required', 'array', 'min:1', 'max:500'],
             'units.*.serial_number' => ['nullable', 'string', 'max:150', 'distinct:ignore_case', Rule::unique('trx_assets', 'serial_number')],
             'units.*.specifications' => ['nullable', 'array', 'max:50'],
@@ -75,49 +77,32 @@ class StoreAssetRegistrationRequest extends FormRequest
                 }
             }
 
+            if (! $this->filled('branch_id')) {
+                return;
+            }
+
+            $companyId = $this->input('company_id');
+
             if ($this->filled('goods_receipt_item_id')) {
+                $companyId = GoodsReceiptItem::query()
+                    ->with('goodsReceipt:id,company_id')
+                    ->find($this->input('goods_receipt_item_id'))
+                    ?->goodsReceipt?->company_id;
+            }
+
+            if ($companyId === null) {
                 return;
             }
 
-            if (! $this->filled('company_id') || ! $this->filled('location_id')) {
-                return;
-            }
-
-            $locationBelongsToCompany = Location::query()
-                ->whereKey($this->input('location_id'))
-                ->where('company_id', $this->input('company_id'))
+            $branchBelongsToCompany = Branch::query()
+                ->withoutGlobalScope('branch_access')
+                ->whereKey($this->input('branch_id'))
+                ->where('company_id', $companyId)
                 ->where('is_active', true)
                 ->exists();
 
-            if (! $locationBelongsToCompany) {
-                $validator->errors()->add('location_id', 'Pilih lokasi aktif yang berada di perusahaan yang dipilih.');
-            }
-
-            if ($this->filled('custodian_id') && $this->filled('department_id')) {
-                $custodian = User::query()->find($this->input('custodian_id'));
-                $custodianBelongsToDepartment = $custodian !== null && (
-                    $custodian->hasGlobalDepartmentAccess()
-                    || $custodian->department_id === $this->input('department_id')
-                    || $custodian->additionalDepartments()->whereKey($this->input('department_id'))->exists()
-                );
-
-                if (! $custodianBelongsToDepartment) {
-                    $validator->errors()->add('custodian_id', 'Penanggung jawab harus memiliki akses ke department aset.');
-                }
-            }
-
-            if ($this->filled('custodian_id')) {
-                $custodianBelongsToCompany = User::query()
-                    ->whereKey($this->input('custodian_id'))
-                    ->where(function ($query): void {
-                        $query->whereNull('company_id')
-                            ->orWhere('company_id', $this->input('company_id'));
-                    })
-                    ->exists();
-
-                if (! $custodianBelongsToCompany) {
-                    $validator->errors()->add('custodian_id', 'Penanggung jawab harus berasal dari perusahaan yang dipilih.');
-                }
+            if (! $branchBelongsToCompany) {
+                $validator->errors()->add('branch_id', 'Pilih branch aktif yang berada di perusahaan aset.');
             }
         }];
     }

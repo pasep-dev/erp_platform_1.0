@@ -27,6 +27,7 @@ interface Branch {
 interface ParentLocation {
     id: string;
     company_id: string;
+    branch_id: string | null;
     code: string;
     name: string;
 }
@@ -47,6 +48,7 @@ const props = defineProps<{
     companies: Company[];
     branches: Branch[];
     parents: ParentLocation[];
+    location_types: Record<string, string>;
 }>();
 
 const form = useForm({
@@ -76,9 +78,10 @@ const filteredParents = computed(() => {
         return [];
     }
 
-    return props.parents.filter(
-        (parent) => parent.company_id === form.company_id,
-    );
+    return props.parents.filter((parent) => {
+        return parent.company_id === form.company_id
+            && (parent.branch_id === null || parent.branch_id === (form.branch_id || null));
+    });
 });
 
 function submit(): void {
@@ -91,6 +94,10 @@ function cancel(): void {
 
 function handleCompanyChange(): void {
     form.branch_id = "";
+    form.parent_id = "";
+}
+
+function handleBranchChange(): void {
     form.parent_id = "";
 }
 </script>
@@ -151,6 +158,7 @@ function handleCompanyChange(): void {
                     v-model="form.branch_id"
                     :disabled="!form.company_id"
                     class="h-11 w-full rounded-lg border border-gray-300 bg-white px-4 text-sm text-gray-800 outline-none focus:border-blue-500 disabled:cursor-not-allowed disabled:bg-gray-100 dark:border-gray-700 dark:bg-gray-900 dark:text-white dark:disabled:bg-gray-800"
+                    @change="handleBranchChange"
                 >
                     <option value="">
                         {{
@@ -185,12 +193,14 @@ function handleCompanyChange(): void {
                     Location Type
                 </label>
 
-                <input
+                <select
                     id="location_type"
                     v-model="form.location_type"
-                    type="text"
-                    class="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 text-sm text-gray-800 outline-none focus:border-blue-500 dark:border-gray-700 dark:text-white"
-                />
+                    class="h-11 w-full rounded-lg border border-gray-300 bg-white px-4 text-sm text-gray-800 outline-none focus:border-blue-500 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                >
+                    <option value="">Pilih tipe lokasi</option>
+                    <option v-for="(label, value) in props.location_types" :key="value" :value="value">{{ label }}</option>
+                </select>
 
                 <p
                     v-if="form.errors.location_type"

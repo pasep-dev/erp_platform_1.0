@@ -3,7 +3,6 @@
 namespace App\Http\Requests\Master\Product;
 
 use App\Http\Requests\Master\AuthorizesMasterData;
-use App\Models\Master\Product\Category;
 use App\Models\Master\Product\Product;
 use App\Services\DepartmentAccessService;
 use Illuminate\Foundation\Http\FormRequest;
@@ -32,9 +31,6 @@ class ProductRequest extends FormRequest
             ? $product->id
             : $product;
         $categoryId = $this->input('category_id');
-        $rootCategoryId = Category::query()
-            ->whereKey($categoryId)
-            ->value('parent_id') ?: $categoryId;
 
         return [
             'department_ids' => ['required', 'array', 'min:1'],
@@ -52,7 +48,8 @@ class ProductRequest extends FormRequest
                 'size:26',
                 Rule::exists('mst_product_categories', 'id')
                     ->whereNull('deleted_at')
-                    ->where('is_active', true),
+                    ->where('is_active', true)
+                    ->whereIn('department_id', app(DepartmentAccessService::class)->departmentIds($this->user())),
             ],
 
             'type_id' => [
@@ -73,7 +70,7 @@ class ProductRequest extends FormRequest
                     ->whereNull('deleted_at')
                     ->where('is_active', true),
                 Rule::exists('mst_product_brand_categories', 'brand_id')
-                    ->whereIn('category_id', array_filter([$rootCategoryId, $categoryId])),
+                    ->where('category_id', $categoryId),
             ],
 
             'model_id' => [

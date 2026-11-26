@@ -14,6 +14,7 @@ use App\Models\Transaction\AssetManagement\Asset;
 use App\Models\Transaction\AssetManagement\AssetMaintenanceRecord;
 use App\Models\User;
 use App\Services\AssetManagement\AssetDirectoryService;
+use App\Services\BranchAccessService;
 use App\Services\DepartmentAccessService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
@@ -21,6 +22,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -94,8 +96,12 @@ class AssetDirectoryController extends Controller
         ]);
     }
 
-    public function index(Request $request, AssetDirectoryService $service, DepartmentAccessService $departmentAccess): Response
-    {
+    public function index(
+        Request $request,
+        AssetDirectoryService $service,
+        BranchAccessService $branchAccess,
+        DepartmentAccessService $departmentAccess,
+    ): Response {
         $user = $request->user();
         abort_unless($user?->can('asset.view'), 403);
 
@@ -103,7 +109,12 @@ class AssetDirectoryController extends Controller
             'search' => ['nullable', 'string', 'max:150'],
             'company_id' => ['nullable', 'ulid', 'exists:mst_org_companies,id'],
             'department_id' => ['nullable', 'ulid', 'exists:mst_org_departments,id'],
-            'location_id' => ['nullable', 'ulid', 'exists:mst_org_locations,id'],
+            'branch_id' => [
+                'nullable',
+                'ulid',
+                Rule::exists('mst_org_branches', 'id')->where('is_active', true)->whereNull('deleted_at'),
+                Rule::in($branchAccess->branchIds($user)),
+            ],
             'status' => ['nullable', 'in:ALL,ACTIVE,MISSING,DISPOSAL_PENDING,DISPOSED'],
             'sort_field' => ['nullable', 'in:asset,company,branch,assignment,status,warranty'],
             'sort_direction' => ['nullable', 'in:asc,desc'],
@@ -135,7 +146,7 @@ class AssetDirectoryController extends Controller
                 'search' => trim((string) ($validated['search'] ?? '')),
                 'company_id' => $validated['company_id'] ?? null,
                 'department_id' => $validated['department_id'] ?? null,
-                'location_id' => $validated['location_id'] ?? null,
+                'branch_id' => $validated['branch_id'] ?? null,
                 'status' => $validated['status'] ?? 'ALL',
                 'sort_field' => $sortField,
                 'sort_direction' => $sortDirection,
@@ -149,7 +160,11 @@ class AssetDirectoryController extends Controller
             ],
             'companies' => Company::query()->whereIn('id', Department::query()->whereIn('id', $departmentAccess->departmentIds($user))->select('company_id'))->where('is_active', true)->orderBy('name')->get(['id', 'code', 'name']),
             'departments' => $departmentAccess->scopeDepartments(Department::query(), $user)->where('is_active', true)->orderBy('name')->get(['id', 'code', 'name']),
-            'locations' => Location::query()->whereIn('company_id', Department::query()->whereIn('id', $departmentAccess->departmentIds($user))->select('company_id'))->where('is_active', true)->orderBy('name')->get(['id', 'company_id', 'branch_id', 'code', 'name']),
+            'branches' => $branchAccess->scopeBranches(Branch::query(), $user)
+                ->whereIn('company_id', Department::query()->whereIn('id', $departmentAccess->departmentIds($user))->select('company_id'))
+                ->where('is_active', true)
+                ->orderBy('name')
+                ->get(['id', 'company_id', 'code', 'name']),
             'can_create_maintenance' => $request->user()?->can('asset.create') === true,
             'can_dispose' => $request->user()?->can('asset.dispose') === true,
             'reminders' => $this->reminders($user, $departmentAccess),

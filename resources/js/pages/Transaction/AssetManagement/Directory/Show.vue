@@ -41,6 +41,7 @@ interface Asset {
     department?: { name: string } | null
     location?: { name: string } | null
     branch?: { name: string } | null
+    assignment_type: 'USER' | 'LOCATION'
     custodian?: { name: string } | null
     assignment_histories: { id: string; number: string; event_type: string; effective_at: string | null; from_custodian?: { name: string } | null; to_custodian?: { name: string } | null; performed_by?: { name: string } | null; remarks: string | null }[]
     maintenance_records: { id: string; number: string; status: string; maintenance_type: string; requested_at: string | null; completed_at: string | null; issue_description: string | null; work_summary: string | null; actual_cost: string | null; next_service_date: string | null; vendor?: { name: string } | null }[]
@@ -169,7 +170,7 @@ function snapshot(snapshot: Record<string, string> | null): string {
                     <div><dt class="text-sm text-gray-500">Metode registrasi</dt><dd class="mt-1">{{ asset.registration_method === 'PROCUREMENT' ? 'Dari procurement' : 'Aset existing' }}</dd></div>
                     <div><dt class="text-sm text-gray-500">Perusahaan / Department</dt><dd class="mt-1">{{ asset.company?.name }} · {{ asset.department?.name }}</dd></div>
                     <div><dt class="text-sm text-gray-500">Lokasi / Cabang</dt><dd class="mt-1">{{ asset.location?.name }} · {{ asset.branch?.name ?? '-' }}</dd></div>
-                    <div><dt class="text-sm text-gray-500">Penanggung jawab saat ini</dt><dd class="mt-1">{{ asset.custodian?.name ?? 'Belum ditentukan' }}</dd></div>
+                    <div><dt class="text-sm text-gray-500">Target penempatan</dt><dd class="mt-1">{{ asset.assignment_type === 'USER' ? asset.custodian?.name ?? 'Pengguna tidak tersedia' : asset.location?.name ?? 'Lokasi tidak tersedia' }}</dd></div>
                     <div><dt class="text-sm text-gray-500">Tanggal perolehan / nilai</dt><dd class="mt-1">{{ date(asset.acquisition_date) }} · {{ money(asset.acquisition_cost) }}</dd></div>
                     <div><dt class="text-sm text-gray-500">Diregistrasi oleh</dt><dd class="mt-1">{{ asset.registered_by?.name ?? '-' }}</dd></div>
                     <div class="sm:col-span-2"><dt class="text-sm text-gray-500">Catatan registrasi</dt><dd class="mt-1 whitespace-pre-line">{{ asset.remarks || '-' }}</dd></div>

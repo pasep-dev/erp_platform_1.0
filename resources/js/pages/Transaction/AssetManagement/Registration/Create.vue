@@ -11,9 +11,17 @@ defineOptions({ layout: AppLayout })
 
 interface Company { id: string; code: string; name: string }
 interface Department { id: string; company_id: string; code: string; name: string }
-interface Location { id: string; company_id: string; branch_id: string | null; code: string; name: string; branch?: { code: string; name: string } | null }
+interface BranchOption {
+    id: string
+    company_id: string
+    code: string
+    name: string
+    warehouse_location_id: string | null
+    warehouse_code: string | null
+    warehouse_name: string | null
+    warehouse_count: number
+}
 interface Product { id: string; category_id: string; type_id: string; brand_id: string; model_id: string | null; code: string; name: string; department_ids: string[]; category?: { name: string } | null; type?: { name: string } | null; brand?: { name: string } | null; model?: { name: string } | null }
-interface UserOption { id: number; company_id: string | null; name: string; email: string; department_ids: string[] }
 interface ProcurementSource {
     goods_receipt_item_id: string
     goods_receipt_number: string
@@ -21,6 +29,9 @@ interface ProcurementSource {
     received_at: string
     company_id: string
     company_name: string
+    branch_id: string | null
+    branch_code: string | null
+    branch_name: string | null
     department_id: string
     department_name: string
     product_id: string
@@ -43,9 +54,8 @@ const props = defineProps<{
     source: ProcurementSource | null
     companies: Company[]
     departments: Department[]
-    locations: Location[]
+    branches: BranchOption[]
     products: Product[]
-    users: UserOption[]
 }>()
 
 function createUnit(): UnitInput {
@@ -57,8 +67,7 @@ const form = useForm({
     product_id: '',
     company_id: props.source?.company_id ?? '',
     department_id: props.source?.department_id ?? '',
-    location_id: '',
-    custodian_id: null as number | null,
+    branch_id: props.source?.branch_id ?? '',
     units: Array.from({ length: props.source?.pending_count ?? 1 }, createUnit) as UnitInput[],
     acquisition_date: (() => { const today = new Date(); today.setMinutes(today.getMinutes() - today.getTimezoneOffset()); return today.toISOString().slice(0, 10) })(),
     acquisition_cost: null as number | null,
@@ -66,19 +75,25 @@ const form = useForm({
 })
 
 const filteredDepartments = computed(() => props.departments.filter((item) => item.company_id === form.company_id))
-const filteredLocations = computed(() => props.locations.filter((item) => item.company_id === form.company_id))
+const filteredBranches = computed(() => props.branches.filter((item) => item.company_id === form.company_id))
 const filteredProducts = computed(() => props.products.filter((product) => product.department_ids.includes(form.department_id)))
 const productOptions = computed(() => filteredProducts.value.map((product) => ({
     ...product,
     label: `${product.code} · ${product.name}`,
 })))
-const filteredUsers = computed(() => props.users.filter((item) => (!item.company_id || item.company_id === form.company_id) && item.department_ids.includes(form.department_id)))
 const selectedProduct = computed(() => props.products.find((item) => item.id === form.product_id))
+const selectedBranch = computed(() => filteredBranches.value.find((item) => item.id === form.branch_id) ?? null)
 const validationMessages = computed(() => Object.values(form.errors).filter((message): message is string => Boolean(message)))
 
 watch(() => form.department_id, () => {
     if (form.product_id && !filteredProducts.value.some((product) => product.id === form.product_id)) {
         form.product_id = ''
+    }
+})
+
+watch(() => form.company_id, (companyId, previousCompanyId) => {
+    if (previousCompanyId && companyId !== previousCompanyId) {
+        form.branch_id = props.source?.branch_id ?? ''
     }
 })
 
@@ -136,7 +151,7 @@ function submit(): void {
 
 <template>
     <div class="procurement-ui space-y-6">
-        <AssetManagementPageHeader :title="source ? 'Registrasi Aset dari Goods Receipt' : 'Registrasi Aset Existing'" section="Registration" description="Data yang disimpan langsung menjadi aset aktif dan terhubung ke sumbernya bila berasal dari procurement." />
+        <AssetManagementPageHeader :title="source ? 'Registrasi Aset dari Goods Receipt' : 'Registrasi Aset Existing'" section="Registration" description="Aset baru didaftarkan tanpa penanggung jawab dan otomatis ditempatkan di warehouse branch yang dipilih." />
 
         <section
             v-if="validationMessages.length"
@@ -180,8 +195,8 @@ function submit(): void {
             <section class="rounded-xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-900">
                 <h2 class="font-semibold text-gray-900 dark:text-white">Identitas dan Penempatan</h2>
                 <div class="mt-4 grid gap-4 sm:grid-cols-2">
-                    <label class="space-y-1 text-sm sm:col-span-2"><span class="font-medium">Lokasi <b class="text-red-500">*</b></span><select v-model="form.location_id" class="h-11 w-full rounded-lg border border-gray-300 bg-white px-3 dark:border-gray-700 dark:bg-gray-900"><option value="">Pilih lokasi</option><option v-for="location in filteredLocations" :key="location.id" :value="location.id">{{ location.name }} ({{ location.branch?.name ?? location.code }})</option></select><small v-if="form.errors.location_id" class="text-red-600">{{ form.errors.location_id }}</small></label>
-                    <label class="space-y-1 text-sm"><span class="font-medium">Penanggung jawab</span><select v-model="form.custodian_id" class="h-11 w-full rounded-lg border border-gray-300 bg-white px-3 dark:border-gray-700 dark:bg-gray-900"><option :value="null">Belum ditentukan</option><option v-for="user in filteredUsers" :key="user.id" :value="user.id">{{ user.name }} ({{ user.email }})</option></select><small v-if="form.errors.custodian_id" class="text-red-600">{{ form.errors.custodian_id }}</small></label>
+                    <label class="space-y-1 text-sm"><span class="font-medium">Branch penempatan <b class="text-red-500">*</b></span><select v-model="form.branch_id" required :disabled="!form.company_id || Boolean(source?.branch_id)" class="h-11 w-full rounded-lg border border-gray-300 bg-white px-3 dark:border-gray-700 dark:bg-gray-900"><option value="">Pilih branch</option><option v-for="branch in filteredBranches" :key="branch.id" :value="branch.id" :disabled="branch.warehouse_count !== 1">{{ branch.code }} · {{ branch.name }}{{ branch.warehouse_count === 1 ? '' : branch.warehouse_count === 0 ? ' — warehouse belum disiapkan' : ' — pastikan hanya satu warehouse aktif' }}</option></select><small v-if="source?.branch_id" class="text-gray-500">Branch mengikuti warehouse Goods Receipt: {{ source.branch_code }} · {{ source.branch_name }}</small><small v-if="form.errors.branch_id" class="text-red-600">{{ form.errors.branch_id }}</small></label>
+                    <div class="space-y-1 text-sm"><span class="font-medium">Warehouse otomatis</span><div class="flex h-11 items-center rounded-lg border border-gray-200 bg-gray-50 px-3 text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200">{{ selectedBranch?.warehouse_location_id ? `${selectedBranch.warehouse_code} · ${selectedBranch.warehouse_name}` : 'Pilih branch dengan satu warehouse aktif' }}</div></div>
                     <label class="space-y-1 text-sm sm:col-span-2"><span class="font-medium">Catatan</span><textarea v-model="form.remarks" rows="3" maxlength="5000" class="w-full rounded-lg border border-gray-300 bg-white p-3 dark:border-gray-700 dark:bg-gray-900" placeholder="Catatan kondisi atau informasi aset"></textarea><small v-if="form.errors.remarks" class="text-red-600">{{ form.errors.remarks }}</small></label>
                 </div>
             </section>

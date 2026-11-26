@@ -11,7 +11,8 @@ interface Category {
     id: string;
     code: string;
     name: string;
-    children_count: number;
+    department_id: string | null;
+    department?: { code: string; name: string } | null;
 }
 
 const props = defineProps<{
@@ -133,8 +134,8 @@ const cancel = () => {
                         <span>
                             <span class="block text-sm font-medium text-gray-800 dark:text-gray-100">{{ category.name }}</span>
                             <span class="text-xs text-gray-500 dark:text-gray-400">{{ category.code }}</span>
-                            <span v-if="category.children_count > 0" class="mt-1 block text-xs text-gray-500 dark:text-gray-400">
-                                {{ category.children_count }} subkategori aktif
+                            <span v-if="category.department" class="mt-1 block text-xs text-gray-500 dark:text-gray-400">
+                                {{ category.department.code }} · {{ category.department.name }}
                             </span>
                         </span>
                     </label>

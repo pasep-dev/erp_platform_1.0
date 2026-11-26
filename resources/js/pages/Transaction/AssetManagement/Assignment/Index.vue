@@ -18,10 +18,11 @@ interface Asset {
     number: string
     serial_number: string | null
     status: string
+    assignment_type: 'USER' | 'LOCATION'
     product: { code: string; name: string } | null
     company: { code: string; name: string } | null
     department: { code: string; name: string } | null
-    location: { code: string; name: string } | null
+    location: { code: string; name: string; location_type?: string | null } | null
     custodian: { name: string; email: string } | null
 }
 
@@ -50,7 +51,7 @@ const rows = computed(() => props.assets.data.map((asset) => ({
     product: asset.product,
     placement: [asset.company?.name, asset.department?.name, asset.location?.name].filter(Boolean).join(' · ') || 'Penempatan tidak tersedia',
     custodian: asset.custodian,
-    assignment_status: asset.custodian ? 'Assigned' : 'Available',
+    assignment_status: asset.assignment_type === 'USER' ? 'Ditugaskan ke user' : asset.location?.location_type?.toUpperCase() === 'WAREHOUSE' ? 'Tersedia' : 'Penempatan lokasi',
 })))
 
 function applyFilters(): void {
@@ -68,25 +69,25 @@ function changePerPage(): void {
 
 <template>
     <div class="procurement-ui space-y-6">
-        <AssetManagementPageHeader title="Asset Assignment" section="Assignment" description="Catat penugasan aset kepada pengguna, perpindahan penanggung jawab, dan pengembalian aset." />
+        <AssetManagementPageHeader title="Asset Assignment" section="Assignment" description="Tempatkan aset kepada pengguna atau ruangan, lalu lihat riwayat perubahan penempatan." />
 
         <section class="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">
-            <DataTableToolbar v-model="search" :total="assets.total" total-label="Aset" placeholder="Kode, produk, atau penanggung jawab..." @search="applyFilters">
-                <AppSelect v-model="assignmentStatus" :options="[{ label: 'Semua Penugasan', value: 'ALL' }, { label: 'Available', value: 'AVAILABLE' }, { label: 'Assigned', value: 'ASSIGNED' }]" class="w-full sm:w-48" aria-label="Filter status penugasan" @change="applyFilters" />
+            <DataTableToolbar v-model="search" :total="assets.total" total-label="Aset" placeholder="Kode, produk, pengguna, atau ruangan..." @search="applyFilters">
+                <AppSelect v-model="assignmentStatus" :options="[{ label: 'Semua Penempatan', value: 'ALL' }, { label: 'Ruangan / lokasi', value: 'LOCATION' }, { label: 'Pengguna', value: 'USER' }]" class="w-full sm:w-48" aria-label="Filter jenis penempatan" @change="applyFilters" />
             </DataTableToolbar>
 
             <CrudTable :columns="columns" :rows="rows" row-key="id" empty-message="Belum ada aset di Asset Directory.">
                 <template #cell-number="{ row }"><span class="font-semibold text-gray-900 dark:text-white">{{ row.number }}</span><div v-if="row.asset.serial_number" class="text-xs text-gray-500">SN {{ row.asset.serial_number }}</div></template>
                 <template #cell-product="{ row }"><div class="font-medium text-gray-900 dark:text-white">{{ row.product?.name ?? 'Produk tidak tersedia' }}</div><div v-if="row.product?.code" class="text-xs text-gray-500">{{ row.product.code }}</div></template>
                 <template #cell-placement="{ row }"><span class="text-xs">{{ row.placement }}</span></template>
-                <template #cell-custodian="{ row }"><div v-if="row.custodian" class="font-medium">{{ row.custodian.name }}</div><span v-else class="text-sm text-gray-500">Belum ditugaskan</span><div v-if="row.custodian" class="text-xs text-gray-500">{{ row.custodian.email }}</div></template>
-                <template #cell-assignment_status="{ row }"><Tag :value="row.assignment_status" :severity="row.assignment_status === 'Assigned' ? 'info' : 'success'" /></template>
+                <template #cell-custodian="{ row }"><div v-if="row.asset.assignment_type === 'USER' && row.custodian" class="font-medium">{{ row.custodian.name }}</div><span v-else class="text-sm text-gray-500">{{ row.asset.location?.name ?? 'Lokasi tidak tersedia' }}</span><div v-if="row.custodian" class="text-xs text-gray-500">{{ row.custodian.email }}</div></template>
+                <template #cell-assignment_status="{ row }"><Tag :value="row.assignment_status" :severity="row.asset.assignment_type === 'USER' ? 'info' : 'success'" /></template>
                 <template #actions="{ row }">
                     <Link :href="route('transaction.asset-management.assignments.show', row.asset.id)" class="inline-flex" aria-label="Riwayat assignment aset" v-tooltip.top="'View detail dan riwayat assignment'">
                         <Button icon="pi pi-eye" severity="info" text rounded aria-label="View" />
                     </Link>
-                    <Link v-if="can_manage && row.asset.status === 'ACTIVE'" :href="route('transaction.asset-management.assignments.create', row.asset.id)" class="inline-flex" :aria-label="row.custodian ? 'Transfer aset' : 'Assign aset'" v-tooltip.top="row.custodian ? 'Transfer penanggung jawab' : 'Assign aset'">
-                        <Button :icon="row.custodian ? 'pi pi-sync' : 'pi pi-user-plus'" severity="success" text rounded :aria-label="row.custodian ? 'Transfer' : 'Assign'" />
+                    <Link v-if="can_manage && row.asset.status === 'ACTIVE'" :href="route('transaction.asset-management.assignments.create', row.asset.id)" class="inline-flex" :aria-label="row.asset.assignment_type === 'USER' ? 'Ubah penempatan aset' : 'Tempatkan aset'" v-tooltip.top="row.asset.assignment_type === 'USER' ? 'Ubah penempatan aset' : 'Tempatkan aset ke pengguna atau ruangan'">
+                        <Button :icon="row.asset.assignment_type === 'USER' ? 'pi pi-sync' : 'pi pi-map-marker'" severity="success" text rounded :aria-label="row.asset.assignment_type === 'USER' ? 'Ubah penempatan' : 'Tempatkan'" />
                     </Link>
                 </template>
             </CrudTable>

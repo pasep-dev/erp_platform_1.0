@@ -4,7 +4,9 @@ namespace App\Http\Controllers\Master\Product;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Master\Product\CategoryRequest;
+use App\Models\Master\Organization\Department;
 use App\Models\Master\Product\Category;
+use App\Services\DepartmentAccessService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -17,14 +19,14 @@ class CategoryController extends Controller
         $search = $request->string('search')->trim()->toString();
 
         $categories = Category::query()
-            ->with('parent')
+            ->with('department:id,code,name')
             ->when($search !== '', function ($query) use ($search) {
                 $query->where(function ($query) use ($search) {
                     $query
                         ->where('code', 'ilike', "%{$search}%")
                         ->orWhere('name', 'ilike', "%{$search}%")
                         ->orWhere('description', 'ilike', "%{$search}%")
-                        ->orWhereHas('parent', function ($query) use ($search) {
+                        ->orWhereHas('department', function ($query) use ($search) {
                             $query
                                 ->where('code', 'ilike', "%{$search}%")
                                 ->orWhere('name', 'ilike', "%{$search}%");
@@ -46,23 +48,18 @@ class CategoryController extends Controller
         );
     }
 
-    public function create(): Response
+    public function create(Request $request, DepartmentAccessService $departmentAccess): Response
     {
-        $categories = Category::query()
+        $departments = Department::query()
             ->where('is_active', true)
-            ->whereNull('parent_id')
+            ->whereIn('id', $departmentAccess->departmentIds($request->user()))
             ->orderBy('name')
-            ->get([
-                'id',
-                'code',
-                'name',
-                'parent_id',
-            ]);
+            ->get(['id', 'code', 'name']);
 
         return Inertia::render(
             'Master/Product/Categories/Create',
             [
-                'categories' => $categories,
+                'departments' => $departments,
             ],
         );
     }
@@ -75,25 +72,19 @@ class CategoryController extends Controller
             ->with('success', 'Asset Category was created successfully.');
     }
 
-    public function edit(Category $category): Response
+    public function edit(Request $request, Category $category, DepartmentAccessService $departmentAccess): Response
     {
-        $categories = Category::query()
+        $departments = Department::query()
             ->where('is_active', true)
-            ->whereNull('parent_id')
-            ->where('id', '!=', $category->id)
+            ->whereIn('id', $departmentAccess->departmentIds($request->user()))
             ->orderBy('name')
-            ->get([
-                'id',
-                'code',
-                'name',
-                'parent_id',
-            ]);
+            ->get(['id', 'code', 'name']);
 
         return Inertia::render(
             'Master/Product/Categories/Edit',
             [
                 'category' => $category,
-                'categories' => $categories,
+                'departments' => $departments,
             ],
         );
     }

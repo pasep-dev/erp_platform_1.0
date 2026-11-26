@@ -4,13 +4,12 @@ namespace App\Http\Controllers\Transaction\AssetManagement;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Transaction\AssetManagement\StoreAssetTransferRequest;
-use App\Models\Master\Organization\Company;
-use App\Models\Master\Organization\Department;
-use App\Models\Master\Organization\Location;
+use App\Models\Master\Organization\Branch;
 use App\Models\Transaction\AssetManagement\Asset;
 use App\Models\Transaction\AssetManagement\AssetTransferHistory;
 use App\Services\AssetManagement\AssetTransferService;
-use App\Services\DepartmentAccessService;
+use App\Services\AssetManagement\BranchWarehouseResolver;
+use App\Services\BranchAccessService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -50,27 +49,32 @@ class AssetTransferController extends Controller
         ]);
     }
 
-    public function create(Request $request, DepartmentAccessService $departmentAccess, ?Asset $asset = null): Response
-    {
+    public function create(
+        Request $request,
+        BranchAccessService $branchAccess,
+        BranchWarehouseResolver $warehouseResolver,
+        ?Asset $asset = null,
+    ): Response {
         $user = $request->user();
         abort_unless($user?->can('asset.transfer'), 403);
-        $departmentIds = $departmentAccess->departmentIds($user);
-
         if ($asset !== null) {
             abort_unless($asset->status === Asset::STATUS_ACTIVE, 422);
             $asset->load(['product:id,code,name', 'company:id,code,name', 'department:id,code,name', 'branch:id,code,name', 'location:id,code,name']);
         }
 
+        $branches = $branchAccess->scopeBranches(Branch::query(), $user)
+            ->where('is_active', true)
+            ->orderBy('name')
+            ->get(['id', 'company_id', 'code', 'name']);
+
         return Inertia::render('Transaction/AssetManagement/Transfer/Create', [
             'initial_asset' => $asset,
             'assets' => Asset::query()
                 ->where('status', Asset::STATUS_ACTIVE)
-                ->with(['product:id,code,name', 'company:id,code,name', 'department:id,code,name', 'location:id,code,name'])
+                ->with(['product:id,code,name', 'company:id,code,name', 'department:id,code,name', 'branch:id,code,name', 'location:id,code,name'])
                 ->orderBy('number')
-                ->get(['id', 'number', 'serial_number', 'product_id', 'company_id', 'department_id', 'location_id']),
-            'companies' => Company::query()->whereIn('id', Department::query()->whereIn('id', $departmentIds)->select('company_id'))->where('is_active', true)->orderBy('name')->get(['id', 'code', 'name']),
-            'departments' => $departmentAccess->scopeDepartments(Department::query(), $user)->where('is_active', true)->orderBy('name')->get(['id', 'company_id', 'code', 'name']),
-            'locations' => Location::query()->whereIn('company_id', Department::query()->whereIn('id', $departmentIds)->select('company_id'))->where('is_active', true)->with('branch:id,code,name')->orderBy('name')->get(['id', 'company_id', 'branch_id', 'code', 'name']),
+                ->get(['id', 'number', 'serial_number', 'product_id', 'company_id', 'department_id', 'branch_id', 'location_id']),
+            'branches' => $warehouseResolver->options($branches),
         ]);
     }
 

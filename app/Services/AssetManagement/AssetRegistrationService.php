@@ -3,6 +3,7 @@
 namespace App\Services\AssetManagement;
 
 use App\Enums\NumberingModuleCode;
+use App\Models\Master\Organization\Branch;
 use App\Models\Master\Organization\Department;
 use App\Models\Master\Organization\Location;
 use App\Models\Master\Product\Product;
@@ -24,6 +25,8 @@ class AssetRegistrationService
     public function __construct(
         private readonly NumberingService $numberingService,
         private readonly DepartmentAccessService $departmentAccess,
+        private readonly BranchAccessService $branchAccess,
+        private readonly BranchWarehouseResolver $warehouseResolver,
     ) {}
 
     /** @return array<int, array<string, mixed>> */
@@ -108,6 +111,11 @@ class AssetRegistrationService
             'received_at' => $receipt->received_at->toDateString(),
             'company_id' => (string) $receipt->company_id,
             'company_name' => $receipt->company->name,
+            'branch_id' => $receipt->warehouseLocation?->branch_id !== null
+                ? (string) $receipt->warehouseLocation->branch_id
+                : null,
+            'branch_code' => $receipt->warehouseLocation?->branch?->code,
+            'branch_name' => $receipt->warehouseLocation?->branch?->name,
             'department_id' => (string) $receipt->department_id,
             'department_name' => $receipt->department->name,
             'product_id' => (string) $sourceItem->product->id,
@@ -136,6 +144,7 @@ class AssetRegistrationService
             $receiptItem->load([
                 'goodsReceipt.company',
                 'goodsReceipt.department',
+                'goodsReceipt.warehouseLocation.branch',
                 'goodsReceipt.purchaseOrder',
                 'goodsReceipt.purchaseRequest',
                 'purchaseOrderItem.product.category',
@@ -167,8 +176,26 @@ class AssetRegistrationService
             $sourceItem = $this->sourceItem($receiptItem);
             $receipt = $receiptItem->goodsReceipt;
             $this->departmentAccess->authorize($actor, $receipt->department_id);
-            $location = $this->validatedLocation($data['location_id'], (string) $receipt->company_id);
-            $this->assertCustodianDepartment($data['custodian_id'] ?? null, (string) $receipt->department_id, (string) $location->branch_id);
+            $branch = Branch::query()
+                ->where('company_id', $receipt->company_id)
+                ->where('is_active', true)
+                ->find($data['branch_id']);
+
+            if ($branch === null) {
+                throw ValidationException::withMessages([
+                    'branch_id' => 'Branch harus aktif dan berada di perusahaan Goods Receipt.',
+                ]);
+            }
+
+            $receiptBranchId = $receipt->warehouseLocation?->branch_id;
+            if ($receiptBranchId !== null && (string) $receiptBranchId !== (string) $branch->id) {
+                throw ValidationException::withMessages([
+                    'branch_id' => 'Branch aset harus mengikuti branch warehouse pada Goods Receipt.',
+                ]);
+            }
+
+            $this->branchAccess->authorize($actor, (string) $branch->id);
+            $location = $this->warehouseResolver->resolve($branch);
 
             $assets = [];
             foreach ($units as $index => $unit) {
@@ -179,7 +206,6 @@ class AssetRegistrationService
                     departmentId: (string) $receipt->department_id,
                     departmentCode: $receipt->department->code,
                     location: $location,
-                    custodianId: $data['custodian_id'] ?? null,
                     acquisitionDate: $receipt->received_at->toDateString(),
                     acquisitionCost: $sourceItem instanceof PurchaseOrderItem
                         ? $sourceItem->unit_price
@@ -207,7 +233,19 @@ class AssetRegistrationService
                 ->with(['category', 'type', 'brand', 'model'])
                 ->where('group', 'ASSET')
                 ->findOrFail($data['product_id']);
-            $location = $this->validatedLocation($data['location_id'], $data['company_id']);
+            $branch = Branch::query()
+                ->where('company_id', $data['company_id'])
+                ->where('is_active', true)
+                ->find($data['branch_id']);
+
+            if ($branch === null) {
+                throw ValidationException::withMessages([
+                    'branch_id' => 'Pilih branch aktif yang berada di perusahaan aset.',
+                ]);
+            }
+
+            $this->branchAccess->authorize($actor, (string) $branch->id);
+            $location = $this->warehouseResolver->resolve($branch);
             $department = Department::query()
                 ->whereKey($data['department_id'])
                 ->where('company_id', $data['company_id'])
@@ -223,8 +261,6 @@ class AssetRegistrationService
             if (! $product->departments()->whereKey($data['department_id'])->exists()) {
                 throw ValidationException::withMessages(['product_id' => 'Produk belum ditautkan ke department aset.']);
             }
-            $this->assertCustodianDepartment($data['custodian_id'] ?? null, $data['department_id'], (string) $location->branch_id);
-
             $assets = [];
             foreach ($data['units'] as $unit) {
                 $assets[] = $this->createAsset(
@@ -234,7 +270,6 @@ class AssetRegistrationService
                     departmentId: $data['department_id'],
                     departmentCode: $department->code,
                     location: $location,
-                    custodianId: $data['custodian_id'] ?? null,
                     acquisitionDate: $data['acquisition_date'],
                     acquisitionCost: $data['acquisition_cost'] ?? null,
                     serialNumber: $unit['serial_number'] ?? null,
@@ -258,7 +293,6 @@ class AssetRegistrationService
         string $departmentId,
         string $departmentCode,
         Location $location,
-        ?int $custodianId,
         string $acquisitionDate,
         string|float|int|null $acquisitionCost,
         ?string $serialNumber,
@@ -269,21 +303,6 @@ class AssetRegistrationService
         ?string $goodsReceiptItemId,
         ?int $sourceUnitNumber,
     ): Asset {
-        if (
-            $custodianId !== null
-            && ! User::query()
-                ->whereKey($custodianId)
-                ->where('is_active', true)
-                ->where(function ($query) use ($companyId): void {
-                    $query->whereNull('company_id')->orWhere('company_id', $companyId);
-                })
-                ->exists()
-        ) {
-            throw ValidationException::withMessages([
-                'custodian_id' => 'Penanggung jawab harus aktif dan berasal dari perusahaan aset.',
-            ]);
-        }
-
         if ($product->category === null || $product->type === null || $product->brand === null) {
             throw ValidationException::withMessages([
                 'product_id' => 'Data kategori, tipe, dan merek produk harus lengkap sebelum registrasi.',
@@ -327,7 +346,8 @@ class AssetRegistrationService
             'department_id' => $departmentId,
             'location_id' => $location->id,
             'branch_id' => $location->branch_id,
-            'custodian_id' => $custodianId,
+            'custodian_id' => null,
+            'assignment_type' => Asset::ASSIGNMENT_LOCATION,
             'goods_receipt_item_id' => $goodsReceiptItemId,
             'source_unit_number' => $sourceUnitNumber,
             'serial_number' => $serialNumber,
@@ -342,34 +362,13 @@ class AssetRegistrationService
         ]);
     }
 
-    private function assertCustodianDepartment(?int $custodianId, string $departmentId, string $branchId): void
-    {
-        if ($custodianId === null) {
-            return;
-        }
-
-        $custodian = User::query()->find($custodianId);
-        $belongsToDepartment = $custodian !== null && (
-            $custodian->hasGlobalDepartmentAccess()
-            || $custodian->department_id === $departmentId
-            || $custodian->additionalDepartments()->whereKey($departmentId)->exists()
-        );
-
-        if (! $belongsToDepartment) {
-            throw ValidationException::withMessages(['custodian_id' => 'Penanggung jawab harus memiliki akses ke department aset.']);
-        }
-
-        if (! app(BranchAccessService::class)->canAccess($custodian, $branchId)) {
-            throw ValidationException::withMessages(['custodian_id' => 'Penanggung jawab harus memiliki akses ke branch aset.']);
-        }
-    }
-
     private function loadReceiptItem(string $goodsReceiptItemId): GoodsReceiptItem
     {
         return GoodsReceiptItem::query()
             ->with([
                 'goodsReceipt.company',
                 'goodsReceipt.department',
+                'goodsReceipt.warehouseLocation.branch',
                 'goodsReceipt.purchaseOrder',
                 'goodsReceipt.purchaseRequest',
                 'purchaseOrderItem.product.category',
@@ -407,23 +406,6 @@ class AssetRegistrationService
     private function sourceItem(GoodsReceiptItem $receiptItem): ?Model
     {
         return $receiptItem->purchaseOrderItem ?? $receiptItem->purchaseRequestItem;
-    }
-
-    private function validatedLocation(string $locationId, string $companyId): Location
-    {
-        $location = Location::query()
-            ->with('company:id,code,name', 'branch:id,code,name')
-            ->where('company_id', $companyId)
-            ->where('is_active', true)
-            ->find($locationId);
-
-        if ($location === null) {
-            throw ValidationException::withMessages([
-                'location_id' => 'Lokasi harus aktif dan berasal dari perusahaan aset.',
-            ]);
-        }
-
-        return $location;
     }
 
     /** @param array<int, array{name: string, value: string}> $specifications

@@ -30,6 +30,7 @@ trait HasDepartmentAccessScope
             $relation = $model->departmentAccessRelation();
             if ($relation !== null) {
                 $query->whereHas($relation, function (Builder $relatedQuery) use ($departmentIds): void {
+                    $relatedQuery->withoutGlobalScope('branch_access');
                     $relatedModel = $relatedQuery->getModel();
                     $relatedTable = $relatedModel->getTable();
 

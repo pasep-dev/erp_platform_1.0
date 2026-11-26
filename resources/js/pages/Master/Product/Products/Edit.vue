@@ -16,7 +16,8 @@ interface Category {
     id: string;
     code: string;
     name: string;
-    parent_id: string | null;
+    department_id: string | null;
+    department?: { code: string; name: string } | null;
 }
 
 interface Type {
@@ -107,15 +108,9 @@ const filteredTypes = computed(() =>
 );
 
 const filteredBrands = computed(() =>
-    props.brands.filter((brand) => {
-        const category = props.categories.find((item) => item.id === form.category_id);
-        const rootCategoryId = category?.parent_id ?? category?.id;
-
-        return brand.categories.some((brandCategory) =>
-            brandCategory.id === form.category_id
-            || (brandCategory.parent_id === null && brandCategory.id === rootCategoryId),
-        );
-    }),
+    props.brands.filter((brand) =>
+        brand.categories.some((brandCategory) => brandCategory.id === form.category_id),
+    ),
 );
 
 const filteredModels = computed(() =>
@@ -133,12 +128,9 @@ watch(
             form.type_id = "";
         }
 
-        const category = props.categories.find((item) => item.id === value);
-        const rootCategoryId = category?.parent_id ?? category?.id;
         const brandExists = props.brands.some((brand) =>
             brand.id === form.brand_id && brand.categories.some((brandCategory) =>
-                brandCategory.id === value
-                || (brandCategory.parent_id === null && brandCategory.id === rootCategoryId),
+                brandCategory.id === value,
             ),
         );
         if (!value || !brandExists) {
@@ -356,7 +348,7 @@ const cancel = () => {
                         :key="item.id"
                         :value="item.id"
                     >
-                        {{ item.name }} ({{ item.code }})
+                        {{ item.department ? `${item.department.name} · ` : '' }}{{ item.name }} ({{ item.code }})
                     </option>
                 </select>
 

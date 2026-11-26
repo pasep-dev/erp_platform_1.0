@@ -66,6 +66,7 @@ interface PaginatedLocations {
 
 interface Props {
     locations: PaginatedLocations;
+    location_types: Record<string, string>;
     filters: {
         search: string;
     };
@@ -224,6 +225,10 @@ function confirmDelete(): void {
                     <span v-else>-</span>
                 </template>
 
+                <template #cell-location_type="{ row }">
+                    {{ props.location_types[row.location_type ?? ""] ?? row.location_type ?? "-" }}
+                </template>
+
                 <template #cell-code="{ row }">
                     <span class="font-medium text-gray-900 dark:text-white">
                         {{ row.code }}
@@ -246,10 +251,6 @@ function confirmDelete(): void {
                     </div>
 
                     <span v-else>-</span>
-                </template>
-
-                <template #cell-location_type="{ row }">
-                    {{ row.location_type || "-" }}
                 </template>
 
                 <template #cell-is_active="{ row }">

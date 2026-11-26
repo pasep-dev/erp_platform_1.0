@@ -100,15 +100,20 @@ trait HasBranchAccessScope
                 }
 
                 if (method_exists($model, 'branchAccessRelationRequiresAll') && $model->branchAccessRelationRequiresAll()) {
-                    $query->whereHas($relation, fn (Builder $relatedQuery) => $relatedQuery->whereIn('branch_id', $branchIds))
+                    $query->whereHas($relation, fn (Builder $relatedQuery) => $relatedQuery
+                        ->withoutGlobalScope('department_access')
+                        ->whereIn('branch_id', $branchIds))
                         ->whereDoesntHave($relation, fn (Builder $relatedQuery) => $relatedQuery
                             ->withoutGlobalScope('branch_access')
+                            ->withoutGlobalScope('department_access')
                             ->where(function (Builder $unauthorizedQuery) use ($branchIds): void {
                                 $unauthorizedQuery->whereNull('branch_id')
                                     ->orWhereNotIn('branch_id', $branchIds);
                             }));
                 } else {
-                    $query->whereHas($relation, fn (Builder $relatedQuery) => $relatedQuery->whereIn('branch_id', $branchIds));
+                    $query->whereHas($relation, fn (Builder $relatedQuery) => $relatedQuery
+                        ->withoutGlobalScope('department_access')
+                        ->whereIn('branch_id', $branchIds));
                 }
             }
         });

@@ -4,12 +4,13 @@ namespace App\Http\Controllers\Transaction\AssetManagement;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Transaction\AssetManagement\StoreAssetRegistrationRequest;
+use App\Models\Master\Organization\Branch;
 use App\Models\Master\Organization\Company;
 use App\Models\Master\Organization\Department;
-use App\Models\Master\Organization\Location;
 use App\Models\Master\Product\Product;
-use App\Models\User;
 use App\Services\AssetManagement\AssetRegistrationService;
+use App\Services\AssetManagement\BranchWarehouseResolver;
+use App\Services\BranchAccessService;
 use App\Services\DepartmentAccessService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -28,8 +29,13 @@ class AssetRegistrationController extends Controller
         ]);
     }
 
-    public function create(Request $request, AssetRegistrationService $service, DepartmentAccessService $departmentAccess): Response
-    {
+    public function create(
+        Request $request,
+        AssetRegistrationService $service,
+        DepartmentAccessService $departmentAccess,
+        BranchAccessService $branchAccess,
+        BranchWarehouseResolver $warehouseResolver,
+    ): Response {
         $user = $request->user();
         abort_unless($user?->can('registration.create'), 403);
         $accessibleDepartmentIds = $departmentAccess->departmentIds($user);
@@ -48,12 +54,11 @@ class AssetRegistrationController extends Controller
             ->where('is_active', true)
             ->orderBy('name')
             ->get(['id', 'company_id', 'code', 'name']);
-        $locations = Location::query()
+        $branches = $branchAccess->scopeBranches(Branch::query(), $user)
             ->whereIn('company_id', Department::query()->whereIn('id', $accessibleDepartmentIds)->select('company_id'))
-            ->with('branch:id,code,name')
             ->where('is_active', true)
             ->orderBy('name')
-            ->get(['id', 'company_id', 'branch_id', 'code', 'name']);
+            ->get(['id', 'company_id', 'code', 'name']);
         $products = Product::query()
             ->where('group', 'ASSET')
             ->where('is_active', true)
@@ -73,38 +78,13 @@ class AssetRegistrationController extends Controller
                 ...$product->toArray(),
                 'department_ids' => $product->departments->pluck('id')->all(),
             ]);
-        $users = User::query()
-            ->where('is_active', true)
-            ->where(function ($query) use ($accessibleDepartmentIds): void {
-                $query->whereIn('department_id', $accessibleDepartmentIds)
-                    ->orWhereHas('additionalDepartments', fn ($departments) => $departments->whereIn('mst_org_departments.id', $accessibleDepartmentIds))
-                    ->orWhereHas('roles', fn ($roles) => $roles->whereIn('name', ['Administrator', 'Owner']));
-            })
-            ->orderBy('name')
-            ->with('additionalDepartments:id')
-            ->get(['id', 'company_id', 'department_id', 'name', 'email'])
-            ->map(fn (User $user): array => [
-                'id' => $user->id,
-                'company_id' => $user->company_id,
-                'name' => $user->name,
-                'email' => $user->email,
-                'department_ids' => $user->hasGlobalDepartmentAccess()
-                    ? $accessibleDepartmentIds
-                    : collect([$user->department_id])
-                        ->merge($user->additionalDepartments->pluck('id'))
-                        ->filter()
-                        ->unique()
-                        ->values()
-                        ->all(),
-            ]);
 
         return Inertia::render('Transaction/AssetManagement/Registration/Create', [
             'source' => $source,
             'companies' => $companies,
             'departments' => $departments,
-            'locations' => $locations,
+            'branches' => $warehouseResolver->options($branches),
             'products' => $products,
-            'users' => $users,
         ]);
     }
 

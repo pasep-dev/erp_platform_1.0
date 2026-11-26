@@ -37,6 +37,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
     'location_id',
     'branch_id',
     'custodian_id',
+    'assignment_type',
     'goods_receipt_item_id',
     'source_unit_number',
     'serial_number',
@@ -67,6 +68,10 @@ class Asset extends Model
 
     public const STATUS_DISPOSED = 'DISPOSED';
 
+    public const ASSIGNMENT_USER = 'USER';
+
+    public const ASSIGNMENT_LOCATION = 'LOCATION';
+
     public const CONDITION_OPTIONS = [
         'GOOD' => 'Baik',
         'FAIR' => 'Cukup',
@@ -91,6 +96,7 @@ class Asset extends Model
         'location_id',
         'branch_id',
         'custodian_id',
+        'assignment_type',
         'goods_receipt_item_id',
         'source_unit_number',
         'serial_number',

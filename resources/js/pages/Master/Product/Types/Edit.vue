@@ -23,7 +23,8 @@ interface CategoryOption {
     id: string;
     code: string;
     name: string;
-    parent_id: string | null;
+    department_id: string | null;
+    department?: { code: string; name: string } | null;
 }
 
 const props = defineProps<{
@@ -83,7 +84,7 @@ const cancel = () => {
                         :key="category.id"
                         :value="category.id"
                     >
-                        {{ category.name }} ({{ category.code }})
+                        {{ category.name }} ({{ category.code }}){{ category.department ? ` · ${category.department.name}` : '' }}
                     </option>
                 </select>
 

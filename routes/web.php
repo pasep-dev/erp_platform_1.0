@@ -149,6 +149,10 @@ Route::middleware([
             ->except(['show']);
         Route::resource('types', TypeController::class)
             ->except(['show']);
+        Route::get('brands/template', [BrandController::class, 'template'])
+            ->name('brands.template');
+        Route::post('brands/import', [BrandController::class, 'import'])
+            ->name('brands.import');
         Route::resource('brands', BrandController::class)
             ->except(['show']);
         Route::resource('models', ModelController::class)

@@ -17,7 +17,8 @@ interface Category {
     id: string;
     code: string;
     name: string;
-    parent_id: string | null;
+    department_id: string | null;
+    department?: { code: string; name: string } | null;
 }
 
 interface Type {
@@ -96,15 +97,9 @@ const filteredTypes = computed(() =>
 );
 
 const filteredBrands = computed(() =>
-    props.brands.filter((brand) => {
-        const category = props.categories.find((item) => item.id === form.category_id);
-        const rootCategoryId = category?.parent_id ?? category?.id;
-
-        return brand.categories.some((brandCategory) =>
-            brandCategory.id === form.category_id
-            || (brandCategory.parent_id === null && brandCategory.id === rootCategoryId),
-        );
-    }),
+    props.brands.filter((brand) =>
+        brand.categories.some((brandCategory) => brandCategory.id === form.category_id),
+    ),
 );
 
 const filteredModels = computed(() =>
@@ -122,11 +117,8 @@ watch(
         }
 
         const selectedBrand = props.brands.find((item) => item.id === form.brand_id);
-        const category = props.categories.find((item) => item.id === categoryId);
-        const rootCategoryId = category?.parent_id ?? category?.id;
         const brandSupportsCategory = selectedBrand?.categories.some((brandCategory) =>
-            brandCategory.id === categoryId
-            || (brandCategory.parent_id === null && brandCategory.id === rootCategoryId),
+            brandCategory.id === categoryId,
         );
 
         if (!categoryId || !brandSupportsCategory) {
@@ -275,7 +267,7 @@ function cancel(): void {
                         <label for="category_id" :class="labelClass">Category <span class="text-red-500">*</span></label>
                         <select id="category_id" v-model="form.category_id" :class="inputClass" required>
                             <option value="" disabled>Pilih category</option>
-                            <option v-for="category in props.categories" :key="category.id" :value="category.id">{{ category.name }} ({{ category.code }})</option>
+                            <option v-for="category in props.categories" :key="category.id" :value="category.id">{{ category.department ? `${category.department.name} · ` : '' }}{{ category.name }} ({{ category.code }})</option>
                         </select>
                         <p v-if="form.errors.category_id" :class="errorClass">{{ form.errors.category_id }}</p>
                     </div>
